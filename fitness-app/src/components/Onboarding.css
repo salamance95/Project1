@@ -1,0 +1,150 @@
+/* 온보딩. 모바일 우선. */
+
+.onboarding-container {
+  display: grid;
+  gap: 20px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6e8ee;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 180ms ease;
+}
+
+.step-content {
+  display: grid;
+  gap: 14px;
+}
+
+.step-content h2 {
+  font-size: 20px;
+}
+
+.subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.options-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.option-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 60px;
+  padding: 14px 16px;
+  color: #0f172a;
+  font: inherit;
+  text-align: left;
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.option-card.selected {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.option-label {
+  font-weight: 800;
+}
+
+.option-desc {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.body-form {
+  display: grid;
+  gap: 12px;
+}
+
+.body-field {
+  display: grid;
+  gap: 6px;
+}
+
+.body-field label {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.body-field .unit {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.body-field input:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  outline: none;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segment {
+  min-height: 46px;
+  color: #334155;
+  font: inherit;
+  font-weight: 800;
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.segment.selected {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.nav-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+@media (min-width: 640px) {
+  .step-content h2 {
+    font-size: 24px;
+  }
+
+  .body-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .option-card:hover {
+    background: #eff6ff;
+    border-color: #2563eb;
+  }
+
+  .nav-buttons {
+    display: flex;
+    justify-content: space-between;
+  }
+}
