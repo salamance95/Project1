@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { DAYS, api, isoDate } from "../api";
-import { muscleClass, musclesOf, prescriptionText } from "../muscles";
+import {
+  muscleClass,
+  musclesOf,
+  prescriptionText,
+  primaryMuscleText,
+} from "../data/muscles";
 
 const EVENT_TYPES = ["회식", "친구 약속", "가족 모임", "여행", "야근 후 야식"];
 const CUISINES = [
@@ -18,10 +23,10 @@ export default function Dashboard({
   userProfile,
   userId,
   routine,
-  onRestart,
   onPlanChange,
   onPlanSwitch,
   onOpenLog,
+  onOpenGuide,
   dataVersion = 0,
 }) {
   const [weeks, setWeeks] = useState([]);
@@ -29,7 +34,6 @@ export default function Dashboard({
   const [weeklyPlan, setWeeklyPlan] = useState(routine.schedule);
   const [weekLogs, setWeekLogs] = useState([]);
   const [missedDays, setMissedDays] = useState([]);
-  const [events, setEvents] = useState([]);
   const [eventForm, setEventForm] = useState({
     day: "금",
     type: "회식",
@@ -41,6 +45,10 @@ export default function Dashboard({
   const [notices, setNotices] = useState([]);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState("");
+  // 대체 운동 패널: 지금 펼친 자리와 그 자리의 후보들.
+  const [swapTarget, setSwapTarget] = useState(null);
+  const [alternatives, setAlternatives] = useState([]);
+  const [altState, setAltState] = useState("idle");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -119,16 +127,6 @@ export default function Dashboard({
     }
   };
 
-  const workoutDays = useMemo(
-    () => weeklyPlan.filter((item) => !item.isRestDay).map((item) => item.day),
-    [weeklyPlan],
-  );
-
-  const completionRate =
-    workoutDays.length === 0
-      ? 0
-      : Math.round((completedDays.filter((d) => workoutDays.includes(d)).length / workoutDays.length) * 100);
-
   const weeklyNutrition = useMemo(
     () =>
       weeklyPlan.reduce(
@@ -143,11 +141,59 @@ export default function Dashboard({
     [weeklyPlan],
   );
 
-  const calorieDelta = weeklyNutrition.calories - routine.weeklyNutrition.calories;
-
   const addNotice = (message) => {
     if (!message) return;
     setNotices((prev) => [message, ...prev].slice(0, 5));
+  };
+
+  // 가진 기구. 계획에 있는 동작이라도 그날 기구가 없을 수 있어 표시만 해 둔다.
+  const ownedEquipment = useMemo(
+    () => new Set(["맨몸", ...(userProfile?.equipment ?? [])]),
+    [userProfile],
+  );
+
+  const toggleAlternatives = async (day, position, item) => {
+    if (swapTarget && swapTarget.day === day && swapTarget.position === position) {
+      setSwapTarget(null);
+      return;
+    }
+
+    setSwapTarget({ day, position, slug: item.slug, name: item.name });
+    setAlternatives([]);
+    setAltState("loading");
+
+    try {
+      const result = await api.exerciseAlternatives(item.slug, userId);
+      setAlternatives(result.alternatives ?? []);
+      setAltState("ready");
+    } catch (err) {
+      setError(`${err.message} 대체 운동을 불러오지 못했습니다.`);
+      setAltState("error");
+    }
+  };
+
+  const swapExercise = async (alternative) => {
+    if (!swapTarget) return;
+    setIsBusy(true);
+    setError("");
+
+    try {
+      const result = await api.swapExercise({
+        userId,
+        planId: routine.planId,
+        day: swapTarget.day,
+        position: swapTarget.position,
+        slug: alternative.slug,
+      });
+      setWeeklyPlan(result.schedule);
+      addNotice(`${result.message} 로 바꿨습니다.`);
+      onPlanChange?.(result.schedule);
+      setSwapTarget(null);
+    } catch (err) {
+      setError(`${err.message} 동작을 바꾸지 못했습니다.`);
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const markMissed = async (day) => {
@@ -183,7 +229,6 @@ export default function Dashboard({
       setWeeklyPlan(result.schedule);
       setTactics(result.tactics);
       setRebalance(result.rebalance);
-      setEvents((prev) => [...prev, event]);
       addNotice(
         `${event.day}요일 ${event.type}(${event.cuisine}) 반영 — 초과 ${result.rebalance.surplus}kcal 중 ` +
           `${result.rebalance.applied ?? 0}kcal를 남은 요일에 분산했습니다.`,
@@ -198,33 +243,26 @@ export default function Dashboard({
 
   return (
     <section className="dashboard-layout">
-      <div className="panel dashboard-summary">
+      <header className="page-head">
         <div>
-          <p className="eyebrow">Active Weekly Plan</p>
-          <h2>{routine.title}</h2>
-          <p>{routine.description}</p>
-        </div>
-        <button className="secondary-button" onClick={onRestart}>
-          다시 설문하기
-        </button>
-      </div>
-
-      <nav className="week-nav" aria-label="주차 이동">
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => prevWeek && switchWeek(prevWeek.planId)}
-          disabled={!prevWeek || weekBusy}
-        >
-          ‹ 이전 주
-        </button>
-
-        <div className="week-label">
-          <strong>{routine.weekStart} 주간</strong>
-          <span>
-            {ordered.length > 0 ? `${currentIndex + 1} / ${ordered.length}주차` : "1주차"}
+          <span className="page-eyebrow">
+            WEEK {ordered.length > 0 ? currentIndex + 1 : 1} · {routine.weekStart.slice(5)} –{" "}
+            {isoDate(routine.weekStart, 6).slice(5)}
+            {routine.split ? ` · ${routine.split}` : ""}
+            {routine.bmi ? ` · BMI ${routine.bmi}` : ""}
           </span>
+          <h1>주간 계획</h1>
         </div>
+
+        <div className="page-actions" aria-label="주차 이동">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => prevWeek && switchWeek(prevWeek.planId)}
+            disabled={!prevWeek || weekBusy}
+          >
+            ‹ 이전 주
+          </button>
 
         {isLatestWeek ? (
           <button
@@ -245,55 +283,30 @@ export default function Dashboard({
             다음 주 ›
           </button>
         )}
-      </nav>
-
-      <div className="metrics-grid">
-        <article className="metric">
-          <span>목표</span>
-          <strong>{userProfile.goal}</strong>
-        </article>
-        <article className="metric">
-          <span>주간 수행률</span>
-          <strong>{completionRate}%</strong>
-        </article>
-        <article className="metric">
-          <span>일정 보정</span>
-          <strong>{missedDays.length + events.length}건</strong>
-        </article>
-        <article className="metric">
-          <span>주간 열량 변동</span>
-          <strong className={calorieDelta > 0 ? "delta-up" : "delta-down"}>
-            {calorieDelta >= 0 ? "+" : ""}
-            {calorieDelta.toLocaleString()} kcal
-          </strong>
-        </article>
-      </div>
+        </div>
+      </header>
 
       {error && <p className="form-error">{error}</p>}
       {isBusy && <p className="panel loading-state">주간 계획을 다시 계산하는 중입니다.</p>}
 
-      {notices.length > 0 && (
-        <section className="panel notice-panel">
-          <p className="eyebrow">Adjustment Log</p>
-          <ul>
-            {notices.map((notice, index) => (
-              <li key={`${notice}-${index}`}>{notice}</li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <section className="panel notice-panel">
+        <span className="page-eyebrow">ADJUSTMENT LOG · 조정 기록</span>
+        <ul>
+          {notices.length > 0 ? (
+            notices.map((notice, index) => <li key={`${notice}-${index}`}>{notice}</li>)
+          ) : (
+            <li>이번 주에 자동 조정은 아직 없습니다.</li>
+          )}
+        </ul>
+        <span className="notice-foot">
+          미수행을 누르면 그날 세션을 이번 주 안에서 뒤로 밀어 재배치하고, 그 자리는 회복일이
+          됩니다. 식단도 새 강도에 맞춰 다시 계산됩니다. 완료 기록은 그 날짜의 기록 탭으로
+          이동하며, 저장해야 수행률과 리포트에 반영됩니다.
+        </span>
+      </section>
+
 
       <section className="panel">
-        <div className="section-heading">
-          <div>
-            <h2>1주일 요일별 운동 및 식단</h2>
-            <p>
-              식단은 그날의 운동 강도에 맞춰 계산됩니다. 못 한 날을 미수행으로 표시하면 남은
-              요일로 자동 재배치됩니다.
-            </p>
-          </div>
-        </div>
-
         <div className="day-lines">
           {weeklyPlan.map((dayPlan, index) => {
             const muscles = musclesOf(dayPlan.workout.items);
@@ -301,7 +314,15 @@ export default function Dashboard({
 
             return (
               <article
-                className={dayPlan.isRestDay ? "day-line rest" : "day-line"}
+                className={[
+                  "day-line",
+                  dayPlan.isRestDay && "rest",
+                  // 그날의 첫 부위 색을 왼쪽 막대로 세운다. 부위 이름 태그는
+                  // 그대로 두므로 색을 못 읽어도 정보가 사라지지 않는다.
+                  muscles.length > 0 && muscleClass(muscles[0]),
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 key={dayPlan.day}
               >
                 <div className="day-line-head">
@@ -330,12 +351,98 @@ export default function Dashboard({
 
                 <ul className="ex-lines">
                   {dayPlan.workout.items?.length
-                    ? dayPlan.workout.items.map((item, position) => (
-                        <li key={`${item.name}-${position}`}>
-                          <span className="ex-name">{item.name}</span>
-                          <span className="ex-num">{prescriptionText(item)}</span>
-                        </li>
-                      ))
+                    ? dayPlan.workout.items.map((item, position) => {
+                        const isOpen =
+                          swapTarget?.day === dayPlan.day && swapTarget?.position === position;
+                        const missingGear =
+                          item.equipment && !ownedEquipment.has(item.equipment);
+
+                        return (
+                          <li key={`${item.name}-${position}`}>
+                            <div className="ex-line">
+                              {item.slug ? (
+                                <button
+                                  type="button"
+                                  className="ex-name link"
+                                  onClick={() => onOpenGuide?.(item.slug)}
+                                  title="운동 설명 보기"
+                                >
+                                  {item.name}
+                                </button>
+                              ) : (
+                                <span className="ex-name">{item.name}</span>
+                              )}
+                              <span className="ex-num">{prescriptionText(item)}</span>
+                            </div>
+
+                            {primaryMuscleText(item.slug) && (
+                              <p className="ex-muscles">
+                                <span>자극</span>
+                                {primaryMuscleText(item.slug)}
+                              </p>
+                            )}
+
+                            {item.slug && (
+                              <div className="ex-line-sub">
+                                {item.equipment && (
+                                  <em className={missingGear ? "tag gear missing" : "tag gear"}>
+                                    {item.equipment}
+                                    {missingGear && " 없음"}
+                                  </em>
+                                )}
+                                <button
+                                  type="button"
+                                  className={isOpen ? "ex-swap open" : "ex-swap"}
+                                  onClick={() => toggleAlternatives(dayPlan.day, position, item)}
+                                  disabled={isBusy}
+                                >
+                                  {isOpen ? "닫기" : "기구 없어요 · 대체 운동"}
+                                </button>
+                              </div>
+                            )}
+
+                            {isOpen && (
+                              <div className="alt-panel">
+                                {altState === "loading" && (
+                                  <p className="loading-state">대체 운동을 찾는 중입니다.</p>
+                                )}
+
+                                {altState === "ready" && alternatives.length === 0 && (
+                                  <p className="empty-note">대신할 만한 동작이 없습니다.</p>
+                                )}
+
+                                {alternatives.map((alternative) => (
+                                  <button
+                                    type="button"
+                                    key={alternative.slug}
+                                    className="alt-item"
+                                    onClick={() => swapExercise(alternative)}
+                                    disabled={isBusy}
+                                  >
+                                    <span className="alt-head">
+                                      <strong>{alternative.name}</strong>
+                                      <em
+                                        className={
+                                          alternative.isHome ? "tag home" : "tag gear"
+                                        }
+                                      >
+                                        {alternative.equipment}
+                                      </em>
+                                    </span>
+                                    {/* 부위와 고른 이유를 붙여 읽으므로, 부위 안의
+                                        가운뎃점과 섞이지 않게 줄표로 나눈다. */}
+                                    <small className="alt-reason">
+                                      {primaryMuscleText(alternative.slug) ||
+                                        alternative.muscle}{" "}
+                                      — {alternative.reason}
+                                    </small>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })
                     : dayPlan.workout.exercises.map((exercise) => (
                         <li key={exercise}>
                           <span className="ex-name">{exercise}</span>
@@ -392,24 +499,8 @@ export default function Dashboard({
         </div>
       </section>
 
-      <section className="panel button-guide">
-        <p className="eyebrow">버튼 안내</p>
-        <ul>
-          <li>
-            <strong>완료 기록</strong> — 그 날짜의 <b>기록 탭</b>으로 이동합니다. 계획된 운동과
-            추천 세트·무게·횟수가 미리 채워져 있고, 저장해야 수행률과 리포트에 반영됩니다.
-          </li>
-          <li>
-            <strong>미수행</strong> — 그날 세션을 <b>이번 주 안에서 뒤로 밀어 재배치</b>합니다.
-            가장 가까운 휴식일로 옮기고 그 자리는 회복일이 되며, 식단도 새 강도에 맞춰 다시
-            계산됩니다. 결과는 서버에 저장되고 조정 기록에 남습니다.
-          </li>
-          <li>
-            위쪽 <strong>주간 수행률</strong>은 버튼이 아니라 실제 저장된 운동 기록에서 계산합니다.
-          </li>
-        </ul>
-      </section>
 
+      <div className="plan-bottom">
       <section className="panel control-grid">
         <div>
           <p className="eyebrow">Cheat Day Guide</p>
@@ -530,6 +621,7 @@ export default function Dashboard({
           ))}
         </div>
       </section>
+      </div>
     </section>
   );
 }

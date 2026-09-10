@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { DAYS, addDays, api, dayIndexOf, isoDate, toIso } from "../api";
 import LogCalendar from "./LogCalendar";
-import { muscleClass } from "../muscles";
+import { muscleClass } from "../data/muscles";
+import { MET_BY_INTENSITY, kcalOfEntry, minutesFromText } from "../data/energy";
 import MealForm from "./MealForm";
-
-// 백엔드 energy.py 와 같은 값. 입력 중에도 추가 소모를 바로 보여주기 위해 함께 둔다.
-const MET_BY_INTENSITY = { high: 6.0, moderate: 5.0, low: 3.8, rest: 2.5 };
-const MINUTES_PER_SET = 3.0;
 
 const STATUSES = [
   { value: "done", label: "완료" },
@@ -63,6 +60,24 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
   const [error, setError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  // 동작 이름 → 지난번에 실제로 든 무게·횟수. 계획의 추천값보다 이걸 먼저 쓴다.
+  const [history, setHistory] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    api
+      .exerciseHistory(userId, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setHistory(result.history ?? {});
+      })
+      .catch(() => {
+        // 지난 기록을 못 불러와도 계획의 추천값으로 채우면 된다.
+        if (!controller.signal.aborted) setHistory({});
+      });
+
+    return () => controller.abort();
+  }, [userId, reloadToken]);
 
   // 달력에 표시할 범위. 달 경계에 걸친 주까지 덮도록 넉넉히 잡는다.
   const rangeStart = addDays(monthAnchor, -7);
@@ -98,18 +113,6 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
   }, [logs.daily]);
 
   const todaySummary = dailyByDate[selectedDate] ?? null;
-
-  const workoutsByDate = useMemo(() => {
-    const map = {};
-    for (const item of logs.workouts) map[item.date] = item.status;
-    return map;
-  }, [logs.workouts]);
-
-  const mealCountByDate = useMemo(() => {
-    const map = {};
-    for (const item of logs.meals) map[item.date] = (map[item.date] ?? 0) + 1;
-    return map;
-  }, [logs.meals]);
 
   const existingWorkout = useMemo(
     () => logs.workouts.find((item) => item.date === selectedDate) ?? null,
@@ -161,10 +164,14 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
         sets: form.sets
           .filter((entry) => entry.exerciseName && toNumber(entry.sets) > 0)
           .map((entry) => ({
+            // 어떤 동작인지 알려줘야 서버가 동작별 열량을 계산할 수 있다.
+            slug: entry.slug ?? null,
+            exerciseId: entry.exerciseId ?? null,
             exerciseName: entry.exerciseName,
             sets: toNumber(entry.sets),
             weightKg: toNumber(entry.weightKg),
             reps: toNumber(entry.reps),
+            distanceKm: toNumber(entry.distanceKm),
           })),
       });
       setMessage(`${selectedDate} 운동 기록을 저장했습니다.`);
@@ -177,18 +184,20 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
     }
   };
 
-  const saveMeal = async ({ mealType, description }) => {
+  const saveMeal = async ({ mealType, description, calories, protein, carbs, fat }) => {
     setIsBusy(true);
     setError("");
     setMessage("");
 
     try {
-      // 열량을 비워 보내면 서버가 먹은 음식 텍스트에서 추정해 채운다.
+      // 화면에서 이미 추정했으면 그 값을 그대로 보낸다.
+      // 비워 보내면 서버가 먹은 음식 텍스트에서 다시 추정해 채운다.
       const result = await api.logMeal({
         userId,
         date: selectedDate,
         mealType,
         description,
+        ...(calories === undefined ? {} : { calories, protein, carbs, fat }),
       });
       setMessage(
         `${selectedDate} ${mealType} 기록 추가 — ${result.calories.toLocaleString()}kcal, ` +
@@ -220,22 +229,26 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
 
   return (
     <section className="log-layout">
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Daily Log</p>
-            <h2>기록 달력</h2>
-            <p>날짜를 눌러 기록할 날을 고르세요. 기록한 값이 주간 리포트의 근거가 됩니다.</p>
-          </div>
+      <header className="page-head">
+        <div>
+          <span className="page-eyebrow">
+            {selectedDate.replace(/-/g, ".")} · {DAYS[dayIndexOf(selectedDate)]}요일
+          </span>
+          <h1>기록</h1>
         </div>
+      </header>
+
+      <section className="panel">
+        <p className="page-lede">
+          날짜를 눌러 기록할 날을 고르세요. 기록한 값이 주간 리포트의 근거가 됩니다.
+        </p>
 
         <LogCalendar
           monthAnchor={monthAnchor}
           selectedDate={selectedDate}
           weekStart={weekStart}
           weekEnd={weekEnd}
-          workoutsByDate={workoutsByDate}
-          mealCountByDate={mealCountByDate}
+          dailyByDate={dailyByDate}
           onSelect={pickDate}
           onMonthChange={setMonthAnchor}
         />
@@ -244,7 +257,7 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
           <p className="trained-muscles">
             <span>이날 한 부위</span>
             {todaySummary.muscles.map((muscle) => (
-              <em className="tag muscle" key={muscle}>
+              <em className={`tag ${muscleClass(muscle)}`} key={muscle}>
                 {muscle}
               </em>
             ))}
@@ -331,78 +344,13 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
         )}
       </section>
 
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <h2>이번 주 요일별 기록</h2>
-            <p>완료한 운동, 먹은 것, 흡수·소모 칼로리와 단백질을 한눈에 봅니다.</p>
-          </div>
-        </div>
-
-        <div className="week-lines">
-          {DAYS.map((dayName, index) => {
-            const iso = isoDate(weekStart, index);
-            const entry = dailyByDate[iso];
-            const planDay = plan.schedule[index];
-            const intake = entry?.intake ?? { calories: 0, protein: 0 };
-            const logged = Boolean(entry?.workoutStatus || entry?.meals?.length);
-
-            return (
-              <button
-                type="button"
-                key={iso}
-                className={[
-                  "week-line",
-                  iso === selectedDate ? "selected" : "",
-                  logged ? "" : "quiet",
-                ].join(" ")}
-                onClick={() => pickDate(iso)}
-              >
-                <span className="week-line-day">{dayName}</span>
-
-                <span className="week-line-main">
-                  <span className="week-line-top">
-                    <strong>{planDay.workout.focus}</strong>
-                    {entry?.workoutStatus === "done" && <em className="dot done">완료</em>}
-                    {entry?.workoutStatus === "partial" && <em className="dot partial">부분</em>}
-                    {entry?.workoutStatus === "missed" && <em className="dot missed">미수행</em>}
-                  </span>
-
-                  {entry?.muscles?.length > 0 && (
-                    <span className="muscle-row">
-                      {entry.muscles.map((muscle) => (
-                        <em className={`tag ${muscleClass(muscle)}`} key={muscle}>
-                          {muscle}
-                        </em>
-                      ))}
-                    </span>
-                  )}
-
-                  {entry?.meals?.length > 0 && (
-                    <small className="week-line-meal">
-                      {entry.meals.map((meal) => meal.description).join(" / ")}
-                    </small>
-                  )}
-                </span>
-
-                <span className="week-line-num">
-                  <span className="in">+{intake.calories.toLocaleString()}</span>
-                  <span className="out">−{(entry?.burnedKcal ?? 0).toLocaleString()}</span>
-                  <small>
-                    P {intake.protein}/{planDay.meal.protein}
-                  </small>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
 
       {message && <p className="log-message">{message}</p>}
       {error && <p className="form-error">{error}</p>}
 
       <WorkoutForm
-        key={`${selectedDate}-${existingWorkout?.id ?? "new"}`}
+        key={`${selectedDate}-${existingWorkout?.id ?? "new"}-${history ? "h" : "0"}`}
+        history={history}
         dayPlan={dayPlan}
         existing={existingWorkout}
         isBusy={isBusy}
@@ -454,6 +402,7 @@ export default function LogPanel({ userId, plan, onLogged, initialDate, weightKg
 function WorkoutForm({
   dayPlan,
   existing,
+  history,
   isBusy,
   weekStart,
   selectedDate,
@@ -473,23 +422,70 @@ function WorkoutForm({
           item.muscle ? `${item.name}(${item.muscle})` : item.name,
         ),
       );
+      // 저장된 기록에는 측정 방식이 없다. 계획에서 찾고, 없으면 값으로 되짚는다.
+      const byName = new Map(
+        (dayPlan?.workout.items ?? []).map((item) => [
+          item.muscle ? `${item.name}(${item.muscle})` : item.name,
+          item,
+        ]),
+      );
+      const metricByName = new Map([...byName].map(([name, item]) => [name, item.metric]));
+      const metByName = new Map(
+        [...byName].map(([name, item]) => [
+          name,
+          {
+            met: item.met,
+            speedKmh: item.speedKmh,
+            minutes: minutesFromText(item.prescription),
+            slug: item.slug,
+            exerciseId: item.exerciseId,
+          },
+        ]),
+      );
+
       return (existing.exercises ?? []).map((entry) => ({
         exerciseName: entry.exerciseName,
         sets: entry.sets,
         weightKg: entry.weightKg,
         reps: entry.reps,
+        distanceKm: entry.distanceKm || "",
+        slug: metByName.get(entry.exerciseName)?.slug ?? null,
+        exerciseId: metByName.get(entry.exerciseName)?.exerciseId ?? null,
+        met: metByName.get(entry.exerciseName)?.met ?? null,
+        speedKmh: metByName.get(entry.exerciseName)?.speedKmh ?? null,
+        minutes: metByName.get(entry.exerciseName)?.minutes ?? 0,
+        metric:
+          metricByName.get(entry.exerciseName) ??
+          (entry.distanceKm > 0 ? "distance" : entry.weightKg > 0 ? "weight" : "reps"),
         planned: plannedNames.has(entry.exerciseName),
       }));
     }
 
-    // 기록이 없으면 계획된 운동을 추천 수치와 함께 한 줄씩 채운다.
-    return (dayPlan?.workout.items ?? []).map((item) => ({
-      exerciseName: item.muscle ? `${item.name}(${item.muscle})` : item.name,
-      sets: item.sets ?? 3,
-      weightKg: item.recommendedWeight ?? "",
-      reps: item.reps ?? "",
+    // 기록이 없으면 계획된 운동을 한 줄씩 채운다.
+    // 값은 지난번에 실제로 든 것을 먼저 쓰고, 처음 하는 동작만 계획의 추천값을 쓴다.
+    // 플랜을 바꿔도 이 기록은 남아 있어서 들던 무게에서 이어서 시작하게 된다.
+    return (dayPlan?.workout.items ?? []).map((item) => {
+      const name = item.muscle ? `${item.name}(${item.muscle})` : item.name;
+      // 기록에 남은 이름은 "바벨 백스쿼트(하체)"지만, 부위 표기가 없던 시절의
+      // 기록이나 직접 적은 줄은 "바벨 백스쿼트"로 남아 있다. 둘 다 찾아본다.
+      const last = history?.[name] ?? history?.[item.name];
+
+      return {
+      exerciseName: name,
+      sets: last?.lastSets || item.sets || (item.metric === "distance" || item.metric === "time" ? 1 : 3),
+      weightKg: last?.lastWeightKg || item.recommendedWeight || "",
+      reps: last?.lastReps || item.reps || "",
+      distanceKm: last?.lastDistanceKm || item.distanceKm || "",
+      lastDate: last?.lastDate ?? null,
+      metric: item.metric ?? "reps",
+      met: item.met ?? null,
+      speedKmh: item.speedKmh ?? null,
+      minutes: minutesFromText(item.prescription),
+      slug: item.slug ?? null,
+      exerciseId: item.exerciseId ?? null,
       planned: true,
-    }));
+      };
+    });
   });
 
   const updateSet = (index, field, value) => {
@@ -502,7 +498,18 @@ function WorkoutForm({
   const addExerciseRow = () => {
     setSets((prev) => [
       ...prev,
-      { exerciseName: "", sets: 3, weightKg: "", reps: 10, planned: false },
+      {
+        exerciseName: "",
+        sets: 3,
+        weightKg: "",
+        reps: 10,
+        distanceKm: "",
+        metric: "weight",
+        met: null,
+        speedKmh: null,
+        minutes: 0,
+        planned: false,
+      },
     ]);
   };
 
@@ -516,8 +523,31 @@ function WorkoutForm({
   );
   const loggedSets = sets.reduce((total, entry) => total + (Number(entry.sets) || 0), 0);
   const extraSets = Math.max(loggedSets - plannedSets, 0);
-  const met = MET_BY_INTENSITY[dayPlan?.intensity] ?? MET_BY_INTENSITY.moderate;
-  const extraKcal = Math.round(met * weightKg * ((extraSets * MINUTES_PER_SET) / 60));
+
+  // 계획에 없던 동작을 직접 적었을 때 쓸 기본값(그날 강도 기준).
+  const fallbackMet = MET_BY_INTENSITY[dayPlan?.intensity] ?? MET_BY_INTENSITY.moderate;
+
+  // 열량은 동작마다 다르다. 스쿼트 3세트와 레터럴 레이즈 3세트는 같지 않다.
+  const rowKcal = sets.map((entry) => kcalOfEntry(entry, weightKg, fallbackMet));
+  const loggedKcal = rowKcal.reduce((total, value) => total + value, 0);
+  const plannedKcal = (dayPlan?.workout.items ?? []).reduce(
+    (total, item) =>
+      total +
+      kcalOfEntry(
+        {
+          metric: item.metric,
+          met: item.met,
+          sets: item.sets ?? 0,
+          distanceKm: item.distanceKm ?? 0,
+          speedKmh: item.speedKmh,
+          minutes: minutesFromText(item.prescription),
+        },
+        weightKg,
+        fallbackMet,
+      ),
+    0,
+  );
+  const extraKcal = Math.max(loggedKcal - plannedKcal, 0);
 
   return (
     <section className="panel log-form">
@@ -567,15 +597,17 @@ function WorkoutForm({
         <div className="set-row header">
           <span>운동</span>
           <span>세트</span>
-          <span>무게(kg)</span>
+          <span>무게 · 거리</span>
           <span>횟수</span>
+          <span>소모</span>
           <span />
         </div>
 
         {sets.length === 0 && <p className="empty-note">이 날짜에는 계획된 운동이 없습니다.</p>}
         {sets.length > 0 && !existing && (
           <p className="prefill-note">
-            추천 수치가 미리 채워져 있습니다. 실제로 한 세트·무게·횟수로 고쳐 저장하세요.
+            추천 수치가 미리 채워져 있습니다. 실제로 한 만큼으로 고쳐 저장하세요 —
+            기구 운동은 무게·세트·횟수, 걷기·자전거는 거리(km), 맨몸 운동은 세트·횟수입니다.
           </p>
         )}
 
@@ -596,23 +628,49 @@ function WorkoutForm({
               value={entry.sets}
               onChange={(e) => updateSet(index, "sets", e.target.value)}
             />
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              aria-label="무게(kg)"
-              placeholder="kg"
-              value={entry.weightKg}
-              onChange={(e) => updateSet(index, "weightKg", e.target.value)}
-            />
-            <input
-              type="number"
-              min="0"
-              aria-label="횟수"
-              placeholder="횟수"
-              value={entry.reps}
-              onChange={(e) => updateSet(index, "reps", e.target.value)}
-            />
+
+            {/* 가운데 칸: 기구 운동은 무게, 걷기·자전거는 거리, 맨몸은 쓰지 않는다. */}
+            {entry.metric === "distance" ? (
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                aria-label="거리(km)"
+                placeholder="km"
+                value={entry.distanceKm}
+                onChange={(e) => updateSet(index, "distanceKm", e.target.value)}
+              />
+            ) : entry.metric === "weight" ? (
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                aria-label="무게(kg)"
+                placeholder="kg"
+                value={entry.weightKg}
+                onChange={(e) => updateSet(index, "weightKg", e.target.value)}
+              />
+            ) : (
+              <span className="set-blank">{entry.metric === "time" ? "시간" : "맨몸"}</span>
+            )}
+
+            {/* 유산소는 횟수를 세지 않는다. */}
+            {entry.metric === "distance" || entry.metric === "time" ? (
+              <span className="set-blank">—</span>
+            ) : (
+              <input
+                type="number"
+                min="0"
+                aria-label="횟수"
+                placeholder="횟수"
+                value={entry.reps}
+                onChange={(e) => updateSet(index, "reps", e.target.value)}
+              />
+            )}
+            <span className="set-kcal" title="이 동작의 대략적인 소모 열량">
+              ≈{rowKcal[index]}kcal
+            </span>
+
             {entry.planned ? (
               <span className="planned-tag" title="계획된 운동은 지울 수 없습니다">
                 계획
@@ -629,15 +687,12 @@ function WorkoutForm({
           </div>
         ))}
 
-        {plannedSets > 0 && (
-          <p className={extraSets > 0 ? "extra-note active" : "extra-note"}>
-            계획 {plannedSets}세트 / 기록 {loggedSets}세트
-            {extraSets > 0 && (
-              <>
-                {" "}
-                — <strong>{extraSets}세트 더 함</strong>
-                <span className="extra-kcal">추가 소모 약 {extraKcal}kcal</span>
-              </>
+        {sets.length > 0 && (
+          <p className={extraKcal > 0 ? "extra-note active" : "extra-note"}>
+            기록한 운동 소모 약 <strong>{loggedKcal}kcal</strong>
+            {plannedSets > 0 && ` (계획 ${plannedSets}세트 · 약 ${plannedKcal}kcal / 기록 ${loggedSets}세트)`}
+            {extraKcal > 0 && (
+              <span className="extra-kcal">계획보다 약 {extraKcal}kcal 더</span>
             )}
           </p>
         )}

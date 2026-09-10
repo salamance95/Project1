@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { muscleClass } from "../muscles";
+import { muscleClass } from "../data/muscles";
 
 const MODE_LABEL = {
   progress: "볼륨 증가",
@@ -9,13 +9,6 @@ const MODE_LABEL = {
   maintain: "유지",
 };
 
-const STATUS_LABEL = {
-  done: "완료",
-  partial: "부분",
-  missed: "미수행",
-  rest: "휴식",
-  none: "기록 없음",
-};
 
 function Bar({ label, actual, planned, unit }) {
   const rate = planned ? Math.round((actual / planned) * 100) : 0;
@@ -82,7 +75,7 @@ export default function WeeklyReport({ userId, weekStart, refreshToken, onPlanRe
 
   if (!report) return null;
 
-  const { workout, nutrition, daily, insights } = report;
+  const { workout, nutrition, insights } = report;
 
   const previewNextWeek = async () => {
     setRegenState("loading");
@@ -259,54 +252,6 @@ export default function WeeklyReport({ userId, weekStart, refreshToken, onPlanRe
         </div>
       </section>
 
-      <section className="panel">
-        <h2>요일별 상세</h2>
-        <div className="report-table">
-          <div className="report-row header">
-            <span>요일</span>
-            <span>계획</span>
-            <span>운동</span>
-            <span>볼륨</span>
-            <span>열량(기록/계획)</span>
-            <span>단백질</span>
-          </div>
-          {daily.map((day) => {
-            // 기록이 아무것도 없는 날은 한 줄로 접는다. 빈 칸이 화면을 다 먹지 않게.
-            const empty =
-              !day.volume && !day.actualCalories && day.workoutStatus !== "done";
-
-            if (empty) {
-              return (
-                <div className="report-row empty" key={day.day}>
-                  <span className="report-day">{day.day}</span>
-                  <span className="report-empty">
-                    {day.focus || "휴식"} · {STATUS_LABEL[day.workoutStatus]}
-                  </span>
-                </div>
-              );
-            }
-
-            return (
-              <div className={`report-row status-${day.workoutStatus}`} key={day.day}>
-                <span className="report-day">{day.day}</span>
-                <span data-label="계획">{day.focus || "-"}</span>
-                <span data-label="운동" className={`status-chip ${day.workoutStatus}`}>
-                  {STATUS_LABEL[day.workoutStatus]}
-                </span>
-                <span data-label="볼륨">
-                  {day.volume ? `${day.volume.toLocaleString()}kg` : "-"}
-                </span>
-                <span data-label="열량">
-                  {day.actualCalories.toLocaleString()} / {day.plannedCalories.toLocaleString()}
-                </span>
-                <span data-label="단백질">
-                  {day.actualProtein} / {day.plannedProtein}g
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
 
       {workout.records.length > 0 && (
         <section className="panel">

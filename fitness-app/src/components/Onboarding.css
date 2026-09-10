@@ -129,6 +129,169 @@
   border-top: 1px solid #e2e8f0;
 }
 
+/* BMI 입력과 눈금 */
+
+.bmi-hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.bmi-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+}
+
+.bmi-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.bmi-readout strong {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.bmi-badge {
+  padding: 4px 10px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.bmi-badge.bmi-underweight {
+  background: #dbeafe;
+}
+
+.bmi-badge.bmi-normal {
+  background: #dcfce7;
+}
+
+.bmi-badge.bmi-overweight {
+  background: #fef3c7;
+}
+
+.bmi-badge.bmi-obese {
+  background: #ffedd5;
+}
+
+.bmi-badge.bmi-severely_obese {
+  background: #fee2e2;
+}
+
+.bmi-scale {
+  display: grid;
+  gap: 8px;
+}
+
+.bmi-track {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  margin-top: 20px;
+}
+
+.bmi-band {
+  border-radius: 3px;
+  opacity: 0.5;
+}
+
+.bmi-band.current {
+  opacity: 1;
+}
+
+/* 눈금 위 현재 위치 표시. 아래를 가리키는 삼각형 + 값. */
+.bmi-marker {
+  position: absolute;
+  top: -18px;
+  display: grid;
+  justify-items: center;
+  transform: translateX(-50%);
+}
+
+.bmi-marker::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 7px solid #0f172a;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+}
+
+.bmi-marker-value {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bmi-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  color: #64748b;
+  font-size: 12px;
+  list-style: none;
+}
+
+.bmi-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bmi-legend li.current {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.bmi-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.bmi-cutoffs {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.bmi-panel .photo-button {
+  min-width: 0;
+}
+
+.bmi-panel .photo-status {
+  display: grid;
+  gap: 3px;
+}
+
+.photo-status-line {
+  margin: 0;
+}
+
+.optional-tag {
+  margin-left: 6px;
+  padding: 1px 7px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
 @media (min-width: 640px) {
   .step-content h2 {
     font-size: 24px;
@@ -136,6 +299,10 @@
 
   .body-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bmi-panel {
+    grid-column: 1 / -1;
   }
 
   .option-card:hover {

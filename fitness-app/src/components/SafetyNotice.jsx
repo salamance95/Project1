@@ -11,11 +11,13 @@ export default function SafetyNotice({ safety, onBack }) {
 
   return (
     <section className={`panel safety-notice${blocked ? " blocked" : ""}`}>
-      <div>
-        <p className="eyebrow">Safety Check</p>
-        <h2>{blocked ? "루틴 생성을 중단했습니다" : "안전 점검 결과"}</h2>
-        <p>{safety.summary}</p>
-      </div>
+      <header className="page-head">
+        <div>
+          <span className="page-eyebrow">SAFETY CHECK</span>
+          <h1>{blocked ? "루틴 생성을 중단했습니다" : "안전 점검 결과"}</h1>
+        </div>
+      </header>
+      <p className="page-lede">{safety.summary}</p>
 
       <ul className="safety-list">
         {safety.findings.map((finding) => (

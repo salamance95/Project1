@@ -1,0 +1,1213 @@
+<title>AI 피트니스 플래너 코드 투어</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+/* ============================================================
+   팔레트는 앱 자신의 규칙에서 가져왔다.
+   앱은 "미는 근육 = 따뜻한 계열, 당기는 근육 = 차가운 계열"로
+   부위 색을 정한다. 이 덱도 같은 두 축을 쓴다:
+   따뜻한 색 = 사람 / 문제, 차가운 색 = 코드 / 해결.
+   ============================================================ */
+:root {
+  color-scheme: dark;
+
+  --ground:   #0d1117;
+  --slide:    #151b24;
+  --raised:   #1d2531;
+  --line:     #2c3746;
+  --line-soft:#222b38;
+
+  --chalk:    #e9edf3;
+  --chalk-2:  #a7b3c4;
+  --chalk-3:  #6d7b8d;
+
+  --push:     #f0996b;   /* 미는 계열 — 사람, 문제, 상황 */
+  --pull:     #5dcaa5;   /* 당기는 계열 — 코드, 해결 */
+  --alarm:    #e8615a;   /* 버그, 막힌 것 */
+  --gold:     #e3b04b;
+
+  --display: "Black Han Sans", "IBM Plex Sans KR", system-ui, sans-serif;
+  --body: "IBM Plex Sans KR", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", "IBM Plex Sans KR", ui-monospace, monospace;
+
+  --pad: clamp(28px, 4.4vw, 76px);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--chalk);
+  background: var(--ground);
+  font-family: var(--body);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------ 슬라이드 틀 */
+
+.deck { position: relative; }
+
+.slide {
+  display: none;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: calc(var(--pad) * 0.8) var(--pad) calc(var(--pad) * 1.5);
+  background: var(--ground);
+}
+.slide.on { display: flex; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .slide.on > * { animation: rise 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+  .slide.on > *:nth-child(2) { animation-delay: 0.05s; }
+  .slide.on > *:nth-child(3) { animation-delay: 0.1s; }
+  .slide.on > *:nth-child(4) { animation-delay: 0.14s; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 슬라이드 머리: 번호 · 구획 · 배정 시간 */
+.slide-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.05vw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chalk-3);
+}
+.slide-head .num { color: var(--pull); }
+.slide-head .part { color: var(--chalk-2); letter-spacing: 0.14em; }
+.slide-head .clock { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+
+h2 {
+  margin-top: clamp(18px, 2.4vh, 34px);
+  font-family: var(--display);
+  font-size: clamp(30px, 4.6vw, 62px);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  max-width: 62ch;
+  margin-top: 12px;
+  color: var(--chalk-2);
+  font-size: clamp(15px, 1.55vw, 21px);
+  font-weight: 300;
+  line-height: 1.6;
+}
+.lede strong { color: var(--chalk); font-weight: 600; }
+
+.slide-body { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: clamp(16px, 2.4vh, 30px); min-height: 0; }
+
+/* ------------------------------------------------------ 표지 */
+
+.cover { justify-content: center; gap: 0; }
+.cover-mark {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--mono);
+  font-size: clamp(11px, 1.1vw, 14px);
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--pull);
+}
+.cover-mark::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+
+.cover h1 {
+  margin-top: clamp(20px, 3vh, 40px);
+  font-family: var(--display);
+  font-size: clamp(44px, 8.4vw, 128px);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+.cover h1 em { font-style: normal; color: var(--push); }
+
+.cover .sub {
+  max-width: 56ch;
+  margin-top: clamp(16px, 2.4vh, 28px);
+  color: var(--chalk-2);
+  font-size: clamp(16px, 1.8vw, 24px);
+  font-weight: 300;
+  line-height: 1.55;
+}
+
+.cover-meta {
+  display: flex;
+  gap: clamp(20px, 3vw, 48px);
+  flex-wrap: wrap;
+  margin-top: clamp(28px, 4.5vh, 56px);
+  padding-top: clamp(18px, 2.6vh, 30px);
+  border-top: 1px solid var(--line);
+}
+.cover-meta div { display: grid; gap: 4px; }
+.cover-meta dt {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--chalk-3);
+}
+.cover-meta dd {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(22px, 2.6vw, 36px);
+  font-variant-numeric: tabular-nums;
+}
+.cover-meta dd span { font-family: var(--body); font-size: 0.5em; font-weight: 500; color: var(--chalk-2); }
+
+/* ------------------------------------------------------ 2단 구성 */
+
+.split {
+  display: grid;
+  gap: clamp(18px, 2.4vw, 40px);
+  grid-template-columns: 1fr;
+  align-items: start;
+  min-height: 0;
+}
+@media (min-width: 900px) {
+  .split { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: stretch; }
+  .split.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------ 코드 */
+
+.code-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.code-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: clamp(10px, 1vw, 12.5px);
+  font-weight: 600;
+  color: var(--chalk-3);
+  background: var(--raised);
+  border-bottom: 1px solid var(--line);
+}
+.code-file .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pull); flex: 0 0 auto; }
+.code-file .lang { margin-left: auto; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chalk-3); }
+
+pre {
+  margin: 0;
+  padding: clamp(12px, 1.5vw, 20px);
+  overflow-x: auto;
+  font-size: clamp(11.5px, 1.12vw, 16px);
+  line-height: 1.62;
+}
+code { font-family: var(--mono); }
+pre code { display: block; white-space: pre; }
+
+/* 직접 만든 하이라이트 테마 — 기본 테마는 배경과 싸운다 */
+.hljs-keyword, .hljs-built_in { color: #7aa2f7; }
+.hljs-string, .hljs-regexp { color: var(--pull); }
+.hljs-comment { color: #62708a; font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--gold); }
+.hljs-title, .hljs-title.function_, .hljs-attr, .hljs-property { color: var(--push); }
+.hljs-params { color: var(--chalk); }
+.hljs-variable, .hljs-attribute { color: var(--chalk); }
+.hljs-tag .hljs-name { color: #7aa2f7; }
+
+/* ------------------------------------------------------ 주석 패널 */
+
+.notes { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  padding: 14px 16px;
+  background: var(--slide);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--pull);
+  border-radius: 0 8px 8px 0;
+}
+.note.warm { border-left-color: var(--push); }
+.note.bug  { border-left-color: var(--alarm); }
+
+.note .k {
+  grid-row: span 2;
+  align-self: start;
+  font-family: var(--mono);
+  font-size: clamp(15px, 1.7vw, 22px);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--pull);
+}
+.note.warm .k { color: var(--push); }
+.note.bug .k  { color: var(--alarm); }
+
+.note .t { font-size: clamp(14px, 1.35vw, 18px); font-weight: 600; line-height: 1.4; }
+.note .d { color: var(--chalk-2); font-size: clamp(12.5px, 1.2vw, 15.5px); font-weight: 300; line-height: 1.55; }
+
+/* 화면에 그대로 옮긴 결과 */
+.result {
+  padding: 14px 16px;
+  background: var(--raised);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: clamp(12px, 1.2vw, 16px);
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+}
+.result .lbl { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--chalk-3); }
+.result .bad { color: var(--alarm); }
+.result .good { color: var(--pull); }
+.result .arrow { color: var(--chalk-3); }
+
+/* ------------------------------------------------------ 흐름 / 구조도 */
+
+.flow { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.flow-step {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: clamp(14px, 1.6vw, 22px);
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.flow-step .n {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--chalk-3);
+}
+.flow-step h3 { font-size: clamp(15px, 1.5vw, 20px); font-weight: 600; }
+.flow-step p { margin: 0; color: var(--chalk-2); font-size: clamp(12.5px, 1.15vw, 15px); font-weight: 300; line-height: 1.5; }
+.flow-step:nth-child(odd) { border-top: 2px solid var(--push); }
+.flow-step:nth-child(even) { border-top: 2px solid var(--pull); }
+
+.stack { display: grid; gap: 10px; }
+.tier {
+  display: grid;
+  gap: 6px;
+  padding: clamp(12px, 1.4vw, 18px) clamp(14px, 1.6vw, 22px);
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.tier-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tier-head strong { font-size: clamp(15px, 1.5vw, 20px); font-weight: 600; }
+.tier-head span {
+  font-family: var(--mono);
+  font-size: clamp(10.5px, 1vw, 13px);
+  color: var(--chalk-3);
+  letter-spacing: 0.05em;
+}
+.tier p { margin: 0; color: var(--chalk-2); font-size: clamp(12.5px, 1.15vw, 15.5px); font-weight: 300; line-height: 1.5; }
+.tier.api { border-left: 3px solid var(--push); }
+.tier.core { border-left: 3px solid var(--pull); }
+.tier.data { border-left: 3px solid var(--gold); }
+.tier.ui { border-left: 3px solid #7aa2f7; }
+
+.rail { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--chalk-3); font-family: var(--mono); font-size: 12px; }
+
+/* ------------------------------------------------------ 수치 */
+
+.stats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.stat {
+  padding: clamp(12px, 1.5vw, 20px);
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.stat b {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(26px, 3.4vw, 46px);
+  font-weight: 400;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--pull);
+}
+.stat.warm b { color: var(--push); }
+.stat span { display: block; margin-top: 4px; color: var(--chalk-2); font-size: clamp(12px, 1.1vw, 14.5px); font-weight: 300; }
+
+/* ------------------------------------------------------ 목록 */
+
+.points { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.points li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 14px;
+  padding-left: 0;
+}
+.points .k {
+  grid-row: span 2;
+  font-family: var(--mono);
+  font-size: clamp(13px, 1.3vw, 17px);
+  font-weight: 600;
+  color: var(--pull);
+}
+.points .t { font-size: clamp(15px, 1.45vw, 20px); font-weight: 600; }
+.points .d { color: var(--chalk-2); font-size: clamp(13px, 1.2vw, 16px); font-weight: 300; line-height: 1.55; }
+.points li:nth-child(even) .k { color: var(--push); }
+
+/* ------------------------------------------------------ 달력 미니 데모 */
+
+.cal {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 12px;
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.cal-cell {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: 7px 6px;
+  min-height: 96px;
+  background: var(--raised);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+}
+.cal-cell .d { font-size: 14px; font-weight: 700; }
+.cal-cell .f { color: var(--chalk-2); font-size: 11px; font-weight: 600; }
+.cal-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.cal-chip { padding: 1px 5px; border-radius: 4px; font-size: 9.5px; font-weight: 700; }
+.c-chest { color: #72243e; background: #fbdce7; }
+.c-shoulder { color: #712b13; background: #fbe2d8; }
+.c-back { color: #085041; background: #d3f0e5; }
+.c-core { color: #444441; background: #e9e7de; }
+.cal-kcal { display: flex; gap: 5px; font-family: var(--mono); font-size: 10.5px; font-weight: 600; }
+.cal-kcal .in { color: var(--pull); }
+.cal-kcal .out { color: var(--alarm); }
+
+/* ------------------------------------------------------ 개요 3단 */
+
+.abstract { display: grid; gap: clamp(12px, 1.6vw, 22px); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.abs-col {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: clamp(14px, 1.7vw, 24px);
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.abs-col .k {
+  font-family: var(--mono);
+  font-size: clamp(10px, 1vw, 12px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.abs-col h3 { font-size: clamp(16px, 1.7vw, 23px); font-weight: 600; line-height: 1.3; }
+.abs-col p { margin: 0; color: var(--chalk-2); font-size: clamp(12.5px, 1.2vw, 16px); font-weight: 300; line-height: 1.55; }
+.abs-col:nth-child(1) { border-top: 2px solid var(--push); }
+.abs-col:nth-child(1) .k { color: var(--push); }
+.abs-col:nth-child(2) { border-top: 2px solid var(--pull); }
+.abs-col:nth-child(2) .k { color: var(--pull); }
+.abs-col:nth-child(3) { border-top: 2px solid var(--gold); }
+.abs-col:nth-child(3) .k { color: var(--gold); }
+
+/* ------------------------------------------------------ 목차 */
+
+.toc { display: grid; gap: 2px; }
+.toc-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: clamp(12px, 2vw, 28px);
+  padding: clamp(11px, 1.5vh, 18px) 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.toc-row .part {
+  font-family: var(--mono);
+  font-size: clamp(13px, 1.4vw, 18px);
+  font-weight: 600;
+  color: var(--pull);
+  min-width: 1.6em;
+}
+.toc-row:nth-child(even) .part { color: var(--push); }
+.toc-row .name { font-size: clamp(15px, 1.7vw, 23px); font-weight: 600; }
+.toc-row .desc {
+  color: var(--chalk-3);
+  font-size: clamp(11.5px, 1.1vw, 14.5px);
+  font-weight: 300;
+  text-align: right;
+}
+.toc-row .at {
+  font-family: var(--mono);
+  font-size: clamp(11.5px, 1.15vw, 15px);
+  font-weight: 600;
+  color: var(--chalk-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.4em;
+  text-align: right;
+}
+
+/* ------------------------------------------------------ 요청 흐름 */
+
+.pipe { display: grid; gap: 7px; }
+.pipe-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 14px;
+  padding: clamp(9px, 1.2vw, 15px) clamp(12px, 1.5vw, 18px);
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--pull);
+  border-radius: 0 8px 8px 0;
+}
+.pipe-step:nth-child(even) { border-left-color: var(--push); }
+.pipe-step .n {
+  grid-row: span 2;
+  font-family: var(--mono);
+  font-size: clamp(12px, 1.25vw, 16px);
+  font-weight: 600;
+  color: var(--chalk-3);
+}
+.pipe-step .t { font-size: clamp(13.5px, 1.35vw, 18px); font-weight: 600; }
+.pipe-step .t code { color: var(--pull); font-size: 0.9em; }
+.pipe-step .d { color: var(--chalk-2); font-size: clamp(11.5px, 1.12vw, 14.5px); font-weight: 300; line-height: 1.45; }
+
+/* ------------------------------------------------------ 개선점 */
+
+.road { display: grid; gap: clamp(10px, 1.4vw, 16px); grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.road-item {
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  padding: clamp(14px, 1.7vw, 22px);
+  background: var(--slide);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.road-item .tag {
+  justify-self: start;
+  padding: 2px 9px;
+  font-family: var(--mono);
+  font-size: clamp(9.5px, 0.95vw, 11.5px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+}
+.road-item .tag.next { color: #0b3b2e; background: var(--pull); }
+.road-item .tag.soon { color: #4a2a12; background: var(--push); }
+.road-item .tag.later { color: #3d3115; background: var(--gold); }
+.road-item h3 { font-size: clamp(15px, 1.55vw, 21px); font-weight: 600; line-height: 1.3; }
+.road-item p { margin: 0; color: var(--chalk-2); font-size: clamp(12px, 1.15vw, 15px); font-weight: 300; line-height: 1.5; }
+.road-item .why { color: var(--chalk-3); font-size: clamp(11px, 1.05vw, 13.5px); font-weight: 300; line-height: 1.45; }
+
+/* ------------------------------------------------------ 하단 바 */
+
+.bar {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px var(--pad);
+  background: rgba(13, 17, 23, 0.94);
+  border-top: 1px solid var(--line-soft);
+  backdrop-filter: blur(8px);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--chalk-3);
+}
+.bar .track { position: relative; flex: 1; height: 3px; background: var(--line-soft); border-radius: 2px; overflow: hidden; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--push), var(--pull)); transition: width 0.35s ease; }
+.bar .count { font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+.bar .hint { display: none; }
+@media (min-width: 760px) { .bar .hint { display: inline; } }
+
+button.nav {
+  padding: 4px 10px;
+  color: var(--chalk-2);
+  font: inherit;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+}
+button.nav:hover { color: var(--chalk); border-color: var(--chalk-3); }
+button.nav:focus-visible { outline: 2px solid var(--pull); outline-offset: 2px; }
+
+.kbd {
+  padding: 1px 5px;
+  color: var(--chalk-2);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 10.5px;
+}
+</style>
+
+<div class="deck" id="deck">
+
+  <!-- 1 ------------------------------------------------------------- -->
+  <section class="slide cover on" data-sec="20" data-part="여는 말">
+    <div class="cover-mark">AI Fitness Planner</div>
+    <h1>운동은 계획보다<br><em>지키는 쪽</em>이 어렵다</h1>
+    <p class="sub">설문 한 번으로 일주일 운동과 식단을 짜고, 못 지킨 날은 스스로 고쳐 잡는 웹 서비스. 오늘은 그 안에서 실제로 일하는 코드를 봅니다.</p>
+    <dl class="cover-meta">
+      <div><dt>Frontend</dt><dd>React <span>+ Vite</span></dd></div>
+      <div><dt>Backend</dt><dd>Express <span>+ Drizzle</span></dd></div>
+      <div><dt>코드</dt><dd>14,900<span>줄</span></dd></div>
+      <div><dt>발표</dt><dd>10<span>분</span></dd></div>
+    </dl>
+  </section>
+
+  <!-- 2 개요 --------------------------------------------------------- -->
+  <section class="slide" data-sec="35" data-part="개요">
+    <div class="slide-head"><span class="num">02</span><span class="part">개요</span><span class="clock">0:20</span></div>
+    <div class="slide-body">
+      <h2>한 문장으로</h2>
+      <p class="lede"><strong>설문 한 번으로 일주일 운동과 식단을 만들고, 기록을 읽어 다음 주를 다시 짜는 웹 서비스.</strong> 추천을 AI에 맡기지 않고, 트레이너가 하던 판단을 규칙으로 옮기는 데 무게를 뒀습니다.</p>
+      <div class="abstract">
+        <div class="abs-col">
+          <span class="k">문제</span>
+          <h3>계획은 쉽고 유지가 어렵다</h3>
+          <p>하루를 빠뜨리면 나머지 엿새가 어긋나고, 운동 강도와 무관하게 같은 식단이 나오고, 아픈 곳을 묻지 않습니다.</p>
+        </div>
+        <div class="abs-col">
+          <span class="k">해결</span>
+          <h3>판단을 규칙으로 옮겼다</h3>
+          <p>안전 관문으로 걸러내고, 그날 강도에 맞춰 식단을 계산하고, 못 한 날은 남은 요일로 다시 배치합니다. AI는 사진을 읽는 자리에만 씁니다.</p>
+        </div>
+        <div class="abs-col">
+          <span class="k">결과</span>
+          <h3>돌아가는 서비스 하나</h3>
+          <p>API 29개 · 테이블 23개 · 운동 38종 · 음식 77종. 파이썬으로 만든 백엔드를 JavaScript로 옮기고 응답 24/24 일치를 확인했습니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 목차 --------------------------------------------------------- -->
+  <section class="slide" data-sec="20" data-part="목차">
+    <div class="slide-head"><span class="num">03</span><span class="part">목차</span><span class="clock">0:55</span></div>
+    <div class="slide-body">
+      <h2>오늘 순서</h2>
+      <div class="toc">
+        <div class="toc-row"><span class="part">Ⅰ</span><span class="name">배경과 구조</span><span class="desc">왜 만들었나 · 어떤 층으로 나눴나</span><span class="at">1:15</span></div>
+        <div class="toc-row"><span class="part">Ⅱ</span><span class="name">백엔드 구현 방식</span><span class="desc">요청 하나가 지나가는 길</span><span class="at">3:10</span></div>
+        <div class="toc-row"><span class="part">Ⅲ</span><span class="name">핵심 코드 다섯 장면</span><span class="desc">안전 · 영양 · 한국어 처리 · AI 연동 · 재배치</span><span class="at">4:00</span></div>
+        <div class="toc-row"><span class="part">Ⅳ</span><span class="name">화면과 검증</span><span class="desc">달력 한 칸 · 파이썬에서 JS로 옮기고 맞춰보기</span><span class="at">7:45</span></div>
+        <div class="toc-row"><span class="part">Ⅴ</span><span class="name">앞으로 개선할 점</span><span class="desc">지금의 한계와 다음에 할 일</span><span class="at">9:15</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="35" data-part="문제">
+    <div class="slide-head"><span class="num">04</span><span class="part">문제</span><span class="clock">1:15</span></div>
+    <div class="slide-body">
+      <h2>계획은 완벽한데,<br>월요일이 지나면 쓸모가 없어진다</h2>
+      <div class="split even">
+        <ul class="points">
+          <li><span class="k">01</span><span class="t">하루를 빠뜨리면 계획이 무너진다</span><span class="d">종이에 적은 루틴은 하루 밀리는 순간 나머지 엿새가 전부 어긋납니다.</span></li>
+          <li><span class="k">02</span><span class="t">운동과 식단이 따로 논다</span><span class="d">다리 운동을 한 날과 쉬는 날의 필요 열량은 다른데, 대부분 같은 식단을 줍니다.</span></li>
+          <li><span class="k">03</span><span class="t">아픈 곳을 묻지 않는다</span><span class="d">무릎이 아파도 스쿼트를 추천합니다. 운동 앱에서 이건 안전 문제입니다.</span></li>
+        </ul>
+        <div class="notes">
+          <div class="note warm">
+            <span class="k">↓</span>
+            <span class="t">그래서 세 가지를 자동으로 했습니다</span>
+            <span class="d">아픈 곳을 먼저 걸러내고, 그날 운동 강도에 맞춰 식단을 계산하고, 못 한 날은 남은 요일로 다시 배치합니다.</span>
+          </div>
+          <div class="result">
+            <span class="lbl">이 발표에서 보실 것</span>
+            사람이 판단하던 것을 <span class="good">규칙으로 옮긴 코드</span> 다섯 군데
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="40" data-part="개요">
+    <div class="slide-head"><span class="num">05</span><span class="part">무엇을 만들었나</span><span class="clock">1:50</span></div>
+    <div class="slide-body">
+      <h2>설문에서 시작해 기록으로 돌아오는 한 바퀴</h2>
+      <div class="flow">
+        <div class="flow-step"><span class="n">STEP 1</span><h3>설문</h3><p>목표·경험·빈도·시간·부상·보유 기구를 묻습니다.</p></div>
+        <div class="flow-step"><span class="n">STEP 2</span><h3>안전 확인</h3><p>답변에서 위험 신호를 찾아 막을 것과 경고할 것을 정합니다.</p></div>
+        <div class="flow-step"><span class="n">STEP 3</span><h3>루틴 생성</h3><p>요일마다 운동을 배치하고, 그 강도에 맞는 식단을 붙입니다.</p></div>
+        <div class="flow-step"><span class="n">STEP 4</span><h3>기록</h3><p>달력에서 운동과 식단을 남깁니다. 사진으로도 입력됩니다.</p></div>
+        <div class="flow-step"><span class="n">STEP 5</span><h3>분석·보정</h3><p>수행률을 계산하고 다음 주 루틴을 다시 만듭니다.</p></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>38</b><span>운동 데이터</span></div>
+        <div class="stat warm"><b>77</b><span>음식 영양표</span></div>
+        <div class="stat"><b>29</b><span>API 엔드포인트</span></div>
+        <div class="stat warm"><b>23</b><span>데이터베이스 테이블</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="40" data-part="구조">
+    <div class="slide-head"><span class="num">06</span><span class="part">전체 구조</span><span class="clock">2:30</span></div>
+    <div class="slide-body">
+      <h2>판단하는 층을 화면과 데이터에서 떼어냈다</h2>
+      <div class="split">
+        <div class="stack">
+          <div class="tier ui"><div class="tier-head"><strong>화면</strong><span>React · 5개 탭</span></div><p>계획 · 기록 · 리포트 · 성장 · 운동 찾아보기. 계산은 하지 않고 받아서 보여주기만 합니다.</p></div>
+          <div class="rail">↓ &nbsp;HTTP · JSON&nbsp; ↓</div>
+          <div class="tier api"><div class="tier-head"><strong>API</strong><span>Express · 29개 경로</span></div><p>요청을 검사하고(zod), 아래 도메인 로직을 부르고, 결과를 돌려줍니다.</p></div>
+          <div class="rail">↓</div>
+          <div class="tier core"><div class="tier-head"><strong>도메인 로직</strong><span>안전 · 영양 · 계획 · 리포트</span></div><p>서비스의 판단이 전부 여기 있습니다. 데이터베이스도 프레임워크도 모릅니다.</p></div>
+          <div class="rail">↓</div>
+          <div class="tier data"><div class="tier-head"><strong>저장</strong><span>SQLite · Drizzle ORM</span></div><p>사용자 · 계획 · 운동기록 · 식단기록 · 포인트 · 실험 배정.</p></div>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <span class="k">왜</span>
+            <span class="t">도메인 로직을 따로 뒀나</span>
+            <span class="d">"이 사람에게 이 운동이 안전한가"는 화면 문제도 데이터베이스 문제도 아닙니다. 떼어 놓으면 웹 없이도 함수 하나로 시험할 수 있습니다.</span>
+          </div>
+          <div class="note warm">
+            <span class="k">효과</span>
+            <span class="t">백엔드를 통째로 갈아끼울 수 있었다</span>
+            <span class="d">파이썬으로 만든 백엔드를 JavaScript로 옮길 때, 판단 로직이 한곳에 모여 있어 옮길 대상이 분명했습니다. (11번 슬라이드)</span>
+          </div>
+          <div class="note">
+            <span class="k">AI</span>
+            <span class="t">AI는 선택 부품이다</span>
+            <span class="d">키가 없으면 규칙 기반으로 되돌아가고, 그 사실을 응답에 남깁니다. 조용히 다른 모델이 답하는 게 가장 나쁜 동작입니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 백엔드 구현 방식 ---------------------------------------------- -->
+  <section class="slide" data-sec="50" data-part="백엔드">
+    <div class="slide-head"><span class="num">07</span><span class="part">백엔드 구현 방식</span><span class="clock">3:10</span></div>
+    <div class="slide-body">
+      <h2>요청 하나가 지나가는 길</h2>
+      <div class="split">
+        <div class="pipe">
+          <div class="pipe-step">
+            <span class="n">1</span>
+            <span class="t">경로 &nbsp;<code>router.post("/recommend-routines")</code></span>
+            <span class="d">모든 핸들러를 <code>wrap()</code>으로 감쌌습니다. 비동기 안에서 터진 오류도 놓치지 않고 오류 처리로 넘어갑니다.</span>
+          </div>
+          <div class="pipe-step">
+            <span class="n">2</span>
+            <span class="t">검증 &nbsp;<code>parseBody(schema, req.body)</code></span>
+            <span class="d">zod로 검사하고, 실패하면 FastAPI와 같은 모양의 422를 돌려줍니다. 프론트엔드가 두 백엔드를 구분하지 않아도 됩니다.</span>
+          </div>
+          <div class="pipe-step">
+            <span class="n">3</span>
+            <span class="t">판단 &nbsp;<code>checkProfile()</code> → <code>buildPlans()</code></span>
+            <span class="d">안전 관문에서 막히면 계획을 아예 만들지 않고 사유만 돌려줍니다. 여기서부터는 데이터베이스를 모릅니다.</span>
+          </div>
+          <div class="pipe-step">
+            <span class="n">4</span>
+            <span class="t">저장 &nbsp;<code>crud.savePlan()</code> · Drizzle</span>
+            <span class="d">SQL을 직접 쓰지 않고 스키마로 다룹니다. 22개 테이블의 컬럼 이름을 파이썬 쪽과 한 글자까지 맞췄습니다.</span>
+          </div>
+          <div class="pipe-step">
+            <span class="n">5</span>
+            <span class="t">응답 &nbsp;<code>res.json(...)</code></span>
+            <span class="d">오류는 한 곳의 미들웨어가 <code>{ detail }</code> 형태로 통일해 내보내고, 500만 로그에 남깁니다.</span>
+          </div>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <span class="k">캐시</span>
+            <span class="t">같은 설문이면 다시 계산하지 않는다</span>
+            <span class="d">설문 내용을 SHA-1로 줄여 캐시 키로 씁니다. 루틴 후보는 1시간 보관하고, 기록이 바뀌면 <code>invalidateUser()</code>로 그 사용자 것만 지웁니다.</span>
+          </div>
+          <div class="note warm">
+            <span class="k">폴백</span>
+            <span class="t">AI가 실패하면 규칙이 답한다</span>
+            <span class="d">모델 호출이 실패하면 규칙 기반으로 되돌리되, <code>fallbackFrom</code>과 사유를 응답에 남깁니다. 조용히 다른 모델이 답하는 게 가장 나쁜 동작입니다.</span>
+          </div>
+          <div class="note">
+            <span class="k">계층</span>
+            <span class="t">도메인은 위아래를 모른다</span>
+            <span class="d">라우트는 도메인을 부르고 도메인은 순수 함수입니다. 그래서 웹을 띄우지 않고 함수 하나로 시험할 수 있고, 백엔드 언어를 바꿔도 그대로 옮겨집니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="50" data-part="코드 ①">
+    <div class="slide-head"><span class="num">08</span><span class="part">코드 ① 안전</span><span class="clock">4:00</span></div>
+    <div class="slide-body">
+      <h2>무릎이 아픈 사람에게<br>무엇을 대신 시킬 것인가</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/domain/exercises.js<span class="lang">JavaScript</span></div>
+<pre><code class="language-javascript">#blocked(item, injuries, restrictions, equipment) {
+  if (injuries.some((area) =&gt; item.risk.includes(area))) return true;
+  if (restrictions.no_impact &amp;&amp; item.impact) return true;
+  if (equipment &amp;&amp; !equipment.has(item.equipment)) return true;
+  return false;
+}
+
+// 막힌 고부하 동작이 있으면 그 동작의 대체 체인을 먼저 따라간다.
+let altSlug = origin.alt;
+while (altSlug &amp;&amp; !seen.has(altSlug)) {
+  const alt = this.bySlug.get(altSlug);
+  if (!this.#blocked(alt, injuries, restrictions, equipment)) {
+    return alt;
+  }
+  altSlug = alt.alt;   // 대체의 대체까지 따라간다
+}</code></pre>
+        </div>
+        <div class="notes">
+          <div class="note bug">
+            <span class="k">막기</span>
+            <span class="t">막는 조건은 세 가지뿐</span>
+            <span class="d">아픈 부위, 충격이 큰 동작, 없는 기구. 짧게 유지해야 나중에 조건을 더할 때 안전합니다.</span>
+          </div>
+          <div class="note">
+            <span class="k">잇기</span>
+            <span class="t">막고 끝내지 않고 대체를 찾는다</span>
+            <span class="d">운동마다 <code>alt</code>로 다음 후보를 걸어 뒀습니다. 그것도 막히면 그 다음 후보로 — 사슬을 따라갑니다.</span>
+          </div>
+          <div class="result">
+            <span class="lbl">무릎 통증을 선택하면</span>
+            바벨 백스쿼트 <span class="bad">막힘</span> <span class="arrow">→</span> 고블릿 스쿼트 <span class="bad">막힘</span> <span class="arrow">→</span> <span class="good">박스 스쿼트</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="40" data-part="코드 ②">
+    <div class="slide-head"><span class="num">09</span><span class="part">코드 ② 영양</span><span class="clock">4:50</span></div>
+    <div class="slide-body">
+      <h2>같은 사람이라도<br>다리 하는 날과 쉬는 날은 다르다</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/domain/nutrition.js<span class="lang">JavaScript</span></div>
+<pre><code class="language-javascript">function dailyBaseline(profile, restrictions) {
+  const bmr = bmrMifflin(sex, age, heightCm, weightKg);
+  let activity = ACTIVITY_BY_FREQUENCY[profile.frequency] ?? 1.45;
+  activity += DURATION_BONUS[profile.duration] ?? 0;
+
+  let calories = bmr * activity * goal.calorie_factor;
+  // 성별 하한선과 기초대사량 아래로는 내려가지 않게 막는다.
+  calories = Math.max(
+    clampCalories(calories, profile, restrictions), bmr);
+}
+
+function macrosForIntensity(baseline, intensity) {
+  // 그날 강도에 따라 탄수화물만 오르내린다
+  const calories = baseline.calories * factor.calories;
+  const carbs    = baseline.carbs * factor.carbs;
+  const protein  = baseline.protein;   // 단백질은 고정
+}</code></pre>
+        </div>
+        <div class="notes">
+          <div class="note warm">
+            <span class="k">안전</span>
+            <span class="t">계산 결과에 바닥을 깔았다</span>
+            <span class="d">체중을 빨리 빼려는 목표에서는 열량이 위험할 만큼 내려갈 수 있습니다. 기초대사량 아래로는 절대 내려가지 않게 막습니다.</span>
+          </div>
+          <div class="note">
+            <span class="k">근거</span>
+            <span class="t">탄수화물만 움직이는 이유</span>
+            <span class="d">단백질은 근육 유지에 필요한 양이 정해져 있어 고정하고, 훈련 연료인 탄수화물을 강도에 따라 조절합니다.</span>
+          </div>
+          <div class="result">
+            <span class="lbl">70kg 남성 · 주 4회 · 근육량 증가</span>
+            기초대사량 1,758 <span class="arrow">→</span> 활동 반영 2,680 <span class="arrow">→</span> <span class="good">2,948 kcal</span> · 단백질 144g
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="50" data-part="코드 ③">
+    <div class="slide-head"><span class="num">10</span><span class="part">코드 ③ 한국어 처리</span><span class="clock">5:30</span></div>
+    <div class="slide-body">
+      <h2>"계란 3개와 오트밀 60g"에서<br>숫자를 누구에게 줄 것인가</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/domain/foods.js<span class="lang">JavaScript</span></div>
+<pre><code class="language-javascript">// 1) 겹치지 않게 음식 이름의 '위치'를 먼저 찾는다
+found.push({ at, end: at + token.length, token, food });
+found.sort((a, b) =&gt; a.at - b.at);
+
+// 2) 이름마다 자기 구간 안에서만 수량을 찾는다
+found.forEach((entry, index) =&gt; {
+  const afterEnd = index + 1 &lt; found.length
+    ? found[index + 1].at        // 다음 음식이 나오기 전까지
+    : text.length;
+
+  let match = QUANTITY_RE.exec(text.slice(entry.end, afterEnd));
+  if (!match)
+    match = QUANTITY_RE.exec(text.slice(beforeStart, entry.at));
+});</code></pre>
+        </div>
+        <div class="notes">
+          <div class="note bug">
+            <span class="k">버그</span>
+            <span class="t">처음엔 문장 전체에서 숫자를 찾았다</span>
+            <span class="d">그러다 보니 오트밀이 "3개"를 가져갔습니다. 먼저 나온 숫자가 뒤 음식에 붙어버린 겁니다.</span>
+          </div>
+          <div class="note">
+            <span class="k">수정</span>
+            <span class="t">음식마다 자기 구간을 준다</span>
+            <span class="d">이름 위치를 먼저 정하고, 다음 음식이 나오기 전까지만 숫자를 찾습니다. 뒤에 없으면 앞을 봅니다("3개의 계란").</span>
+          </div>
+          <div class="result">
+            <span class="lbl">계란 3개와 오트밀 60g</span>
+            <span class="bad">전:</span> 계란 3개 · 오트밀 <span class="bad">3개</span><br>
+            <span class="good">후:</span> 계란 3개 · 오트밀 <span class="good">60g</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="45" data-part="코드 ④">
+    <div class="slide-head"><span class="num">11</span><span class="part">코드 ④ AI 연동</span><span class="clock">6:20</span></div>
+    <div class="slide-body">
+      <h2>AI를 믿되,<br>아는 것은 우리 데이터로 답한다</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/domain/foods.js — estimateFromPhoto<span class="lang">JavaScript</span></div>
+<pre><code class="language-javascript">for (const food of modelFoods) {
+  const phrase = `${food.name} ${food.amount}${food.unit}`;
+  const local = estimate(phrase);
+
+  // 음식 DB가 아는 음식이면 DB 값을 쓴다.
+  // 텍스트로 직접 적었을 때와 같은 숫자가 나와야 하기 때문이다.
+  if (local.matched &gt; 0) {
+    items.push(...local.items.map((i) =&gt; ({ ...i, source: "db" })));
+    continue;
+  }
+
+  // DB에 없는 음식만 모델이 준 값을 받는다.
+  usedModel += 1;
+  items.push({ ...food, source: "ai" });
+}</code></pre>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <span class="k">역할</span>
+            <span class="t">AI에게는 '읽기'만 시킨다</span>
+            <span class="d">사진에서 음식 이름과 양을 읽는 일은 AI가 잘합니다. 열량 계산은 우리 영양표가 더 정확하고, 무엇보다 매번 같은 값이 나옵니다.</span>
+          </div>
+          <div class="note bug">
+            <span class="k">함정</span>
+            <span class="t">모르는 음식이 0kcal로 빠졌다</span>
+            <span class="d">처음엔 AI가 이름만 주고 계산은 전부 DB가 했습니다. 그래서 마라탕처럼 표에 없는 음식은 합계에서 통째로 사라졌습니다.</span>
+          </div>
+          <div class="result">
+            <span class="lbl">현미밥 · 치킨 · 마라탕</span>
+            315 <span class="good">db</span> · 450 <span class="good">db</span> · 610 <span class="bad">ai</span> <span class="arrow">→</span> 합계 1,375 kcal
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 ------------------------------------------------------------- -->
+  <section class="slide" data-sec="40" data-part="코드 ⑤">
+    <div class="slide-head"><span class="num">12</span><span class="part">코드 ⑤ 재배치</span><span class="clock">7:05</span></div>
+    <div class="slide-body">
+      <h2>수요일을 빠뜨렸다.<br>남은 나흘을 어떻게 다시 짜는가</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/domain/coaching.js — reschedule<span class="lang">JavaScript</span></div>
+<pre><code class="language-javascript">// 목적지 우선순위: 휴식일 &gt; 가벼운 훈련일 &gt; 남은 아무 날
+const restTargets  = later.filter((i) =&gt; plan[i].isRestDay);
+const lightTargets = later.filter((i) =&gt;
+  ["low", "moderate"].includes(plan[i].intensity));
+
+const targets = restTargets.length  ? restTargets
+              : lightTargets.length ? lightTargets
+              : later;
+
+// 미수행일 자리는 회복일로 비운다.
+plan[index]  = { ...plan[index], isRestDay: true, status: "미수행" };
+plan[target] = { ...missedSession, day: targetDay, status: "재배치됨" };</code></pre>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <span class="k">규칙</span>
+            <span class="t">쉬는 날을 먼저 쓴다</span>
+            <span class="d">이미 힘든 날에 얹으면 그 날도 못 합니다. 비어 있는 날이 없을 때만 가벼운 날과 자리를 바꿉니다.</span>
+          </div>
+          <div class="note warm">
+            <span class="k">정직</span>
+            <span class="t">자리가 없으면 없다고 말한다</span>
+            <span class="d">남은 날이 없으면 억지로 밀어 넣지 않고 다음 주 첫 훈련일로 이월하고, 그 사실을 사용자에게 문장으로 알립니다.</span>
+          </div>
+          <div class="note">
+            <span class="k">연동</span>
+            <span class="t">식단도 같이 따라간다</span>
+            <span class="d">운동이 옮겨가면 그 날의 식단도 새 강도로 다시 계산됩니다. 빈 자리는 휴식일 식단으로 바뀝니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 ------------------------------------------------------------ -->
+  <section class="slide" data-sec="35" data-part="프론트엔드">
+    <div class="slide-head"><span class="num">13</span><span class="part">프론트엔드</span><span class="clock">7:45</span></div>
+    <div class="slide-body">
+      <h2>표를 없애고<br>달력 한 칸에 하루를 담았다</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/components/LogCalendar.jsx<span class="lang">JSX</span></div>
+<pre><code class="language-javascript">&lt;span className="cell-focus"&gt;{shortFocus(entry.planned)}&lt;/span&gt;
+
+{muscles.slice(0, 3).map((muscle) =&gt; (
+  &lt;em className={`cell-muscle ${muscleClass(muscle)}`}&gt;
+    {muscle}
+  &lt;/em&gt;
+))}
+
+{(intake &gt; 0 || entry?.burnedKcal &gt; 0) &amp;&amp; (
+  &lt;span className="cell-energy"&gt;
+    &lt;em className="in"&gt;{intake}&lt;/em&gt;
+    &lt;em className="out"&gt;−{entry.burnedKcal}&lt;/em&gt;
+  &lt;/span&gt;
+)}</code></pre>
+        </div>
+        <div class="notes">
+          <div class="cal">
+            <div class="cal-cell"><span class="d">31</span><span class="f">푸시</span><span class="cal-chips"><em class="cal-chip c-chest">가슴</em><em class="cal-chip c-shoulder">어깨</em><em class="cal-chip c-core">코어</em></span><span class="cal-kcal"><em class="in">550</em><em class="out">−385</em></span></div>
+            <div class="cal-cell"><span class="d">1</span><span class="f">풀</span><span class="cal-chips"><em class="cal-chip c-back">등</em><em class="cal-chip c-core">코어</em></span><span class="cal-kcal"><em class="in">2,940</em></span></div>
+            <div class="cal-cell"><span class="d">2</span><span class="f">휴식</span></div>
+            <div class="cal-cell"><span class="d">3</span><span class="f">레그</span><span class="cal-chips"><em class="cal-chip c-core">하체</em></span></div>
+          </div>
+          <div class="note">
+            <span class="k">부위 색</span>
+            <span class="t">색은 앱 전체에서 같은 뜻이다</span>
+            <span class="d"><code>muscleClass()</code> 한 곳에서 부위→색을 정하고 계획·기록·리포트가 모두 그걸 씁니다. 미는 근육은 따뜻한 색, 당기는 근육은 차가운 색.</span>
+          </div>
+          <div class="note warm">
+            <span class="k">교훈</span>
+            <span class="t">색만으로는 부족했다</span>
+            <span class="d">처음엔 색 막대만 뒀는데 무슨 부위인지 알 수 없었습니다. 칸에 여유가 있으면 이름을 같이 적는 편이 낫습니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 ------------------------------------------------------------ -->
+  <section class="slide" data-sec="35" data-part="이식">
+    <div class="slide-head"><span class="num">14</span><span class="part">백엔드 이식</span><span class="clock">8:20</span></div>
+    <div class="slide-body">
+      <h2>파이썬 백엔드를 JavaScript로 옮기고<br>같은 답이 나오는지 기계로 확인했다</h2>
+      <div class="split">
+        <div class="code-wrap">
+          <div class="code-file"><span class="dot"></span>src/core/num.js — pyRound<span class="lang">JavaScript</span></div>
+<pre><code class="language-javascript">// 파이썬 round(2.5) === 2 · JS Math.round(2.5) === 3
+// 파이썬은 절반일 때 짝수로 붙이고, JS는 무조건 올린다.
+// 열량 계산에 반올림이 잔뜩 들어가서 그대로 두면 응답이 1씩 어긋난다.
+
+if (Math.abs(diff - 0.5) &lt; 1e-9) {
+  rounded = floor % 2 === 0 ? floor : floor + 1;  // 절반이면 짝수로
+} else {
+  rounded = Math.round(abs);
+}</code></pre>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <span class="k">방법</span>
+            <span class="t">두 백엔드를 동시에 띄우고 응답을 맞춰봤다</span>
+            <span class="d">같은 데이터베이스를 보게 하고, 24개 시나리오를 양쪽에 던져 JSON을 통째로 비교하는 스크립트를 만들었습니다.</span>
+          </div>
+          <div class="note warm">
+            <span class="k">발견</span>
+            <span class="t">언어가 다르면 숫자도 다르다</span>
+            <span class="d">반올림 규칙 차이, 시각 형식 차이, 소수점 표기 차이. 눈으로는 절대 못 찾았을 것들을 비교 스크립트가 잡아냈습니다.</span>
+          </div>
+          <div class="result">
+            <span class="lbl">npm run compare</span>
+            일치 <span class="good">24</span> / 불일치 <span class="good">0</span> / 전체 24
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 ------------------------------------------------------------ -->
+  <section class="slide" data-sec="20" data-part="회고">
+    <div class="slide-head"><span class="num">15</span><span class="part">배운 것</span><span class="clock">8:55</span></div>
+    <div class="slide-body">
+      <h2>세 가지를 배웠다</h2>
+      <div class="split even">
+        <ul class="points">
+          <li><span class="k">01</span><span class="t">규칙으로 옮길 수 있는 판단이 생각보다 많다</span><span class="d">"무릎이 아프면 스쿼트 말고 뭘 하지"는 조건 세 줄과 대체 사슬로 옮겨졌습니다. AI가 필요한 자리는 따로 있었습니다.</span></li>
+          <li><span class="k">02</span><span class="t">AI에게는 잘하는 일만 시킨다</span><span class="d">사진을 읽는 일은 맡기고, 숫자를 세는 일은 우리 데이터가 합니다. 키가 없어도 서비스는 그대로 돌아갑니다.</span></li>
+          <li><span class="k">03</span><span class="t">눈으로 검증하면 반드시 놓친다</span><span class="d">백엔드를 옮길 때 화면만 봤다면 반올림 한 자리 차이는 못 찾았을 겁니다. 비교를 자동화한 게 가장 큰 수확이었습니다.</span></li>
+        </ul>
+        <div class="notes">
+          <div class="note">
+            <span class="k">요약</span>
+            <span class="t">규칙이 먼저, AI는 그 다음</span>
+            <span class="d">판단을 규칙으로 옮겨 두면 결과가 매번 같고, 왜 그렇게 나왔는지 설명할 수 있고, 언어를 바꿔도 옮겨집니다. AI는 규칙이 못 하는 자리에만 넣었습니다.</span>
+          </div>
+          <div class="note warm">
+            <span class="k">다음</span>
+            <span class="t">남은 과제는 다음 장에</span>
+            <span class="d">지금 서비스가 못 하는 것과, 이어서 손볼 것들을 정리했습니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15 개선점 ------------------------------------------------------ -->
+  <section class="slide" data-sec="40" data-part="개선">
+    <div class="slide-head"><span class="num">16</span><span class="part">앞으로 개선할 점</span><span class="clock">9:15</span></div>
+    <div class="slide-body">
+      <h2>다음에 손볼 것</h2>
+      <div class="road">
+        <div class="road-item">
+          <span class="tag next">바로</span>
+          <h3>사진 식단 분석을 정식 기능으로</h3>
+          <p>사진을 올리면 AI가 음식과 양을 읽고, 칼로리·단백질·탄수·지방을 대략 계산합니다. 지금은 붙여만 둔 상태라 API 키가 있어야 켜집니다.</p>
+          <span class="why">실제 사진으로 정확도를 재고, 키 없이도 쓸 수 있는 길을 만드는 것이 다음 목표입니다. 식단 기록이 귀찮아서 안 하는 문제를 가장 크게 줄일 기능이라고 봅니다.</span>
+        </div>
+        <div class="road-item">
+          <span class="tag soon">다음</span>
+          <h3>음식 데이터를 넓히기</h3>
+          <p>지금 영양표는 77종이라 외식 메뉴와 가공식품을 담지 못합니다. 모르는 음식은 AI 추정치로 메우지만, 매번 값이 조금씩 달라집니다.</p>
+          <span class="why">자주 나오는 음식부터 표에 넣어 AI에 기대는 비율을 줄이면, 같은 식사에 같은 숫자가 나옵니다.</span>
+        </div>
+        <div class="road-item">
+          <span class="tag soon">다음</span>
+          <h3>개인차를 반영한 강도 조절</h3>
+          <p>지금은 평균값 기반이라 같은 조건이면 누구에게나 같은 볼륨을 줍니다. 회복이 느린 사람에게는 과할 수 있습니다.</p>
+          <span class="why">기록이 쌓이면 수행률과 체감 강도로 개인별 회복 속도를 추정해, 다음 주 볼륨을 사람마다 다르게 잡을 수 있습니다.</span>
+        </div>
+        <div class="road-item">
+          <span class="tag later">이후</span>
+          <h3>실제 사용자로 검증하기</h3>
+          <p>지금까지의 확인은 제가 만든 데이터로 한 것입니다. 안전 규칙이 실제로 부상을 막는지는 아직 알 수 없습니다.</p>
+          <span class="why">소수라도 몇 주 써 보게 하고, 중도 이탈 지점과 재배치가 실제로 도움이 됐는지를 봐야 합니다.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 ------------------------------------------------------------ -->
+  <section class="slide cover" data-sec="5" data-part="맺음">
+    <div class="cover-mark">감사합니다</div>
+    <h1>계획을 지키게 만드는 건<br><em>계획이 아니라</em><br>고쳐 잡는 구조였습니다</h1>
+    <dl class="cover-meta">
+      <div><dt>안전</dt><dd>부상 부위<span>먼저 확인</span></dd></div>
+      <div><dt>연동</dt><dd>운동 강도<span>따라 식단</span></dd></div>
+      <div><dt>복구</dt><dd>못 한 날<span>자동 재배치</span></dd></div>
+      <div><dt>검증</dt><dd>24 / 24<span>응답 일치</span></dd></div>
+    </dl>
+  </section>
+
+</div>
+
+<nav class="bar" aria-label="슬라이드 이동">
+  <button type="button" class="nav" id="prev" aria-label="이전 슬라이드">←</button>
+  <button type="button" class="nav" id="next" aria-label="다음 슬라이드">→</button>
+  <span class="count"><b id="cur">1</b> / <span id="total">13</span></span>
+  <div class="track"><div class="fill" id="fill"></div></div>
+  <span class="count" id="elapsed">0:00 / 10:00</span>
+  <span class="hint"><span class="kbd">←</span> <span class="kbd">→</span> 이동 · <span class="kbd">F</span> 전체화면</span>
+</nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const budget = slides.map((s) => Number(s.dataset.sec));
+  const total = budget.reduce((a, b) => a + b, 0);
+
+  const curEl = document.getElementById("cur");
+  const fillEl = document.getElementById("fill");
+  const elapsedEl = document.getElementById("elapsed");
+  document.getElementById("total").textContent = slides.length;
+
+  const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
+
+  let at = 0;
+
+  function show(next) {
+    at = Math.max(0, Math.min(slides.length - 1, next));
+    slides.forEach((s, i) => s.classList.toggle("on", i === at));
+
+    // 진행 표시는 슬라이드 수가 아니라 '배정한 시간'을 따른다.
+    const spent = budget.slice(0, at + 1).reduce((a, b) => a + b, 0);
+    fillEl.style.width = `${(spent / total) * 100}%`;
+    curEl.textContent = at + 1;
+    elapsedEl.textContent = `${mmss(spent)} / ${mmss(total)}`;
+
+    window.scrollTo(0, 0);
+    try {
+      localStorage.setItem("deck-at", String(at));
+    } catch {}
+  }
+
+  document.getElementById("next").addEventListener("click", () => show(at + 1));
+  document.getElementById("prev").addEventListener("click", () => show(at - 1));
+
+  document.addEventListener("keydown", (event) => {
+    if (["ArrowRight", "PageDown", " "].includes(event.key)) { event.preventDefault(); show(at + 1); }
+    else if (["ArrowLeft", "PageUp"].includes(event.key)) { event.preventDefault(); show(at - 1); }
+    else if (event.key === "Home") show(0);
+    else if (event.key === "End") show(slides.length - 1);
+    else if (event.key === "f" || event.key === "F") {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    }
+  });
+
+  let startX = null;
+  document.addEventListener("touchstart", (e) => { startX = e.changedTouches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 60) show(at + (dx < 0 ? 1 : -1));
+    startX = null;
+  }, { passive: true });
+
+  let restored = 0;
+  try {
+    restored = Number(localStorage.getItem("deck-at")) || 0;
+  } catch {}
+  show(restored);
+
+  if (window.hljs) {
+    document.querySelectorAll("pre code").forEach((block) => window.hljs.highlightElement(block));
+  }
+</script>

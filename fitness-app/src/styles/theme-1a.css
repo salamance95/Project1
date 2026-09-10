@@ -1,0 +1,1360 @@
+/* ============================================================
+   1A 트레이닝 데스크 — 테마 패치
+   ------------------------------------------------------------
+   기존 App.css 를 고치지 않고 뒤에 덧씌우는 파일입니다.
+   App.css 를 불러온 다음 줄에서 import 합니다(App.jsx).
+
+   클래스명은 그대로 씁니다.
+
+   [적용 보정] 이 표시가 붙은 자리는 받은 패치를 이 코드에 맞춰 고친 곳입니다.
+   실제 JSX 의 클래스 이름과 화면 구조에 맞추느라 바꿨고, 무엇을 왜 바꿨는지
+   각 자리에 적어 뒀습니다. 디자인 값(색·타이포·간격)은 그대로 둡니다.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Anton&display=swap");
+
+/* ---------------------------------------------------- 1. 토큰 교체 */
+
+:root {
+  --page-pad: 32px;
+  --gap: 22px;
+  --radius: 5px;
+  --tap: 46px;
+  --tabbar-h: 0px;
+
+  --line: #dcdfe2;
+  --ink: #14171a;
+  --muted: #5b6169;
+  --surface: #ffffff;
+  --surface-2: #f7f8f6;
+
+  /* 브랜드 = 잉크. 흰 글자를 얹는 버튼이 많아 어두운 값을 둡니다. */
+  --brand: #14171a;
+  /* 강조 = 라임. 검은 글자와만 같이 씁니다. */
+  --accent: oklch(0.78 0.2 128);
+
+  --f-display: "Black Han Sans", "IBM Plex Sans KR", sans-serif;
+  --f-num: "Anton", "IBM Plex Sans KR", sans-serif;
+
+  --hero-shadow: none;
+  --hero-radius: 5px;
+
+  --side-w: 236px;
+  --side-bg: #14171a;
+  --side-bg-2: #22272c;
+  --side-line: #2b3036;
+  --side-ink: #ffffff;
+  --side-muted: #a9b0b8;
+}
+
+:root,
+body {
+  color: #14171a;
+  font-family: "IBM Plex Sans KR", system-ui, "Segoe UI", sans-serif;
+  background: #eceef0;
+}
+
+a { color: #14171a; }
+a:hover { color: #5b6169; }
+
+/* ---------------------------------------------------- 2. 셸 → 사이드바 */
+
+.app-shell {
+  max-width: 1280px;
+  padding: 0;
+  gap: 0;
+  background: var(--surface-2);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+@media (min-width: 1024px) {
+  /* [적용 보정] 원본은 .app-shell 전체에 grid-template-areas 를 걸었지만,
+     탭 바는 대시보드에서만 렌더된다(설문·추천·로딩 화면에는 없다).
+     그래서 사이드바 레이아웃은 탭 바가 있을 때만 켠다. */
+  .app-shell:has(> .tab-bar) {
+    display: grid;
+    grid-template-columns: var(--side-w) minmax(0, 1fr);
+    align-items: start;
+    min-height: 100vh;
+  }
+
+  /* [적용 보정] 원본은 본문 자식을 전부 grid-area: body 로 묶었는데,
+     한 화면에 최상위 섹션이 둘 이상이면(성장 탭 = 성장 + 리포트) 같은 칸에
+     겹쳐 쌓인다. 열만 지정하고 행은 자동 배치에 맡긴다. */
+  .app-shell:has(> .tab-bar) > .app-header {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .app-shell:has(> .tab-bar) > *:not(.app-header):not(.tab-bar) {
+    grid-column: 2;
+    margin: 0 32px 40px;
+  }
+
+  /* 본문 첫 블록(헤더·탭 바 다음)은 캔버스의 padding-top 30px 자리다.
+     위 규칙과 같은 무게를 줘야 margin 축약형에 지워지지 않는다. */
+  .app-shell:has(> .tab-bar) > *:nth-child(3):not(.app-header):not(.tab-bar) {
+    margin-top: 30px;
+  }
+
+  .app-shell:has(> .tab-bar) > .panel:first-of-type {
+    margin-top: 22px;
+  }
+
+  /* 설문·추천·로딩 화면은 사이드바가 없으므로 여백만 준다. */
+  .app-shell:not(:has(> .tab-bar)) {
+    padding: 24px 32px 40px;
+    gap: var(--gap);
+  }
+
+  /* 헤더는 오른쪽 본문 위로 */
+  .app-header {
+    align-items: flex-end;
+    padding: 30px 32px 20px;
+    border-bottom: 2px solid #14171a;
+  }
+
+  /* [적용 보정] 1A 의 헤더는 제목만 남는다. 패치는 스텝퍼가 이미 숨어 있다고
+     봤지만, App.css 는 960px 이상에서 다시 켠다. 여기서 다시 끈다. */
+  .stepper {
+    display: none;
+  }
+
+  /* [적용 보정] 캔버스에서 앱 이름과 계정은 사이드바에만 있고, 본문은 화면
+     제목 줄로 시작한다. 좁은 화면에는 사이드바가 없어 헤더가 그 역할을 하므로
+     JSX 에서 지우지 않고 사이드바가 서는 폭에서만 통째로 숨긴다. */
+  .app-header {
+    display: none;
+  }
+
+  /* 탭 바를 왼쪽 기둥으로 세웁니다 */
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    grid-column: 1;
+    grid-row: 1 / span 99;
+    display: grid;
+    grid-auto-flow: row;
+    /* [적용 보정] auto 로 두면 안에 들어온 패널이 기둥 폭을 밀어낸다. */
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 4px;
+    height: 100vh;
+    padding: 26px 20px;
+    overflow-y: auto;
+    background: var(--side-bg);
+    border-top: none;
+    backdrop-filter: none;
+  }
+
+  /* [적용 보정] 머리글은 캔버스처럼 두 줄("AI FITNESS" + "트레이닝 데스크")이라
+     가상 요소로는 못 만든다. .rail-brand 블록으로 App.jsx 에 넣었다. */
+
+  /* ------------------------------------------------ 탭 버튼(세로 기둥)
+     [적용 보정] 원본에는 이 규칙에 미디어 쿼리가 없었다. 좁은 화면의 하단
+     탭 바는 6칸 균등 분할이라 왼쪽 정렬 가로 배치를 그대로 먹이면 아이콘과
+     글자가 한 줄에 끼여 깨진다. 사이드바일 때만 적용한다. */
+  .tab {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: 46px;
+    padding: 13px 14px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    border-radius: 4px;
+  }
+
+  .tab-icon {
+    font-size: 16px;
+    opacity: 0.9;
+  }
+}
+
+/* 좁은 화면은 원래대로 하단 탭 바 */
+@media (max-width: 1023px) {
+  .app-shell {
+    padding: 16px 16px 92px;
+    gap: 18px;
+  }
+
+  .tab-bar {
+    background: rgba(20, 23, 26, 0.96);
+    border-top: 1px solid var(--side-line);
+  }
+}
+
+/* ---------------------------------------------------- 3. 탭 버튼(공통) */
+
+.tab {
+  color: var(--side-muted);
+}
+
+.tab.active {
+  color: #14171a;
+  font-weight: 700;
+  background: var(--accent);
+}
+
+.tab.active .tab-icon { opacity: 1; }
+
+/* ---------------------------------------------------- 4. 헤더 */
+
+.app-header {
+  align-items: flex-end;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #14171a;
+}
+
+.app-header h1 {
+  font-family: var(--f-display);
+  /* [적용 보정] 40px 는 사이드바가 서는 넓은 화면 기준이다. 375px 에서는 제목 줄이
+     제 칸을 넘어 로그인 버튼 위로 겹쳐 그려지므로 폭에 따라 줄인다.
+     (좁은 화면용 규칙을 위쪽 미디어 쿼리에 두면 이 선언이 나중에 나와서 덮어쓴다.) */
+  font-size: clamp(26px, 4.2vw, 40px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.app-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: none;
+}
+
+/* ---------------------------------------------------- 5. 카드 위계 */
+
+.panel {
+  padding: 22px;
+  border-radius: 5px;
+}
+
+/* 히어로는 그림자 대신 위쪽 라임 선으로 구분 */
+.panel.dashboard-summary,
+.panel.level-card,
+.panel.guide-detail {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--accent);
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.panel h2,
+.section-heading h2 {
+  font-family: var(--f-display);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* ---------------------------------------------------- 6. 버튼 */
+
+.primary-button,
+.secondary-button {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  border-radius: 4px;
+}
+
+.primary-button {
+  color: #14171a;
+  background: var(--accent);
+  border: 1px solid #14171a;
+}
+
+.secondary-button {
+  color: #14171a;
+  background: var(--surface);
+  border: 1px solid #cdd2d6;
+}
+
+/* ---------------------------------------------------- 7. 숫자 · 지표
+
+   [적용 보정] 원본이 부른 이름(.metric-value .stat-value .level-points
+   .summary-value .record-best .kcal-value)은 이 코드에 없다. 같은 자리를
+   맡고 있는 실제 클래스로 바꿔 단다. */
+
+.metric strong,
+.point-value,
+.growth-rate,
+.record-line-best,
+.day-letter,
+.side-figure,
+.today-meal strong {
+  font-family: var(--f-num);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* ---------------------------------------------------- 8. 입력 · 선택 */
+
+input,
+select,
+textarea {
+  min-height: var(--tap);
+  color: #14171a;
+  background: #ffffff;
+  border: 1px solid #cdd2d6;
+  border-radius: 4px;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid #14171a;
+  outline-offset: 1px;
+}
+
+/* [적용 보정] 기록 탭 세트 표의 칸 안 입력은 원래 촘촘하다.
+   46px 를 그대로 먹이면 표가 두 배로 길어져 표 안에서만 되돌린다. */
+.set-table input,
+.set-table select {
+  min-height: 34px;
+}
+
+/* [적용 보정] 사이드바가 236px 를 가져가면서 본문 폭이 1072px → 963px 로 좁아진다.
+   세트 표의 입력은 저마다 고유 폭(약 206px)을 가지고 있어서 그 폭에서는 표가
+   화면 밖으로 넘친다(가로 스크롤바가 생긴다). 줄어들 수 있게 둔다. */
+.set-row input,
+.set-row select {
+  min-width: 0;
+}
+
+/* ---------------------------------------------------- 9. 칩 · 선택지
+
+   [적용 보정] 실제 이름은 .chip / .chip.on (음악), .segment.selected (설문),
+   .meal-chip.selected (식단), .option-card.selected (설문 카드)다.
+   원본의 .genre-chip .duration-chip .survey-option 은 이 코드에 없다. */
+
+.chip,
+.meal-chip,
+.segment {
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.chip.on,
+.meal-chip.selected,
+.segment.selected {
+  color: #14171a;
+  background: var(--accent);
+  border: 1px solid #14171a;
+}
+
+/* 설문 선택지는 사각 카드로 */
+.option-card {
+  border-radius: 4px;
+}
+
+.option-card.selected {
+  background: #f4f7ef;
+  border: 2px solid #14171a;
+}
+
+/* ---------------------------------------------------- 10. 진행 바
+
+   [적용 보정] .progress-track / .macro-track / .macro-fill 은 없는 이름이다.
+   실제로는 .progress-bar > .progress-fill (설문), .badge-track > .badge-fill
+   (뱃지), .report-bar-track > .report-bar-fill (리포트·기록·레벨)을 쓴다.
+   영양 막대의 .under(부족)·.over(초과)는 뜻이 붙은 색이라 그대로 두고,
+   '좋음'을 뜻하는 .good 만 라임으로 맞춘다. */
+
+.progress-bar,
+.badge-track,
+.report-bar-track {
+  background: #e4e7e3;
+  border-radius: 999px;
+}
+
+.progress-fill,
+.badge-fill,
+.report-bar-fill.good {
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+/* ---------------------------------------------------- 11. 사이드바 블록 (SideRail.jsx) */
+
+/* [적용 보정] 이 블록은 탭 바 안에 들어간다. 좁은 화면의 탭 바는 하단 고정
+   6칸 균등 분할이라 같이 세우면 탭이 찌그러진다. 그래서 기본은 숨기고
+   사이드바가 서는 폭에서만 켠다(계정 메뉴는 그 폭에서 헤더의 것을 쓴다).
+   숨기는 규칙을 위쪽 미디어 쿼리에 두면 이 선언이 나중에 나와서 덮어쓴다. */
+.side-rail {
+  display: none;
+  gap: 22px;
+  align-content: start;
+  margin-top: 26px;
+}
+
+@media (min-width: 1024px) {
+  .side-rail {
+    display: grid;
+  }
+}
+
+.side-block {
+  display: grid;
+  gap: 6px;
+  padding-top: 20px;
+  border-top: 1px solid var(--side-line);
+}
+
+.side-label {
+  color: var(--side-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.side-figure {
+  color: var(--side-ink);
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.side-note {
+  color: var(--side-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.side-restart {
+  justify-self: start;
+  padding: 10px 13px;
+  color: var(--side-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px dashed #3a4046;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.side-restart:hover {
+  color: #14171a;
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+/* 사이드바로 옮겨 온 기존 컴포넌트들의 배경을 어두운 기둥에 맞춥니다.
+
+   [적용 보정] 플랜 목록의 실제 이름은 .plan-row / .plan-row.current 이고
+   (.plan-option 은 없다), 그 안에 .plan-row-main · .plan-row-badge ·
+   .plan-switcher-new 가 더 있다. 어두운 기둥 위에서 글자가 묻히지 않게
+   같이 맞춘다. */
+
+.side-rail .auth-panel,
+.side-rail .plan-switcher {
+  color: #e7eaed;
+}
+
+/* [적용 보정] 두 패널은 원래 헤더 아래로 떠서 열리는 드롭다운이라 고정 폭을
+   갖고 있다(.plan-switcher-panel = min(340px, 78vw), .auth-menu = 200px).
+   236px 기둥 안에 세우면 그대로 넘치므로 폭을 기둥에 맞춘다. */
+.side-rail,
+.side-rail .plan-switcher,
+.side-rail .auth-panel {
+  min-width: 0;
+}
+
+.side-rail .auth-menu,
+.side-rail .plan-switcher-panel {
+  position: static;
+  width: auto;
+  min-width: 0;
+  padding: 12px;
+  background: var(--side-bg-2);
+  border: 1px solid var(--side-line);
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+/* 이름과 버튼이 한 줄에 못 들어간다. 줄을 바꾸게 둔다. */
+.side-rail .plan-row {
+  flex-wrap: wrap;
+}
+
+.side-rail .auth-menu-note,
+.side-rail .plan-switcher-note,
+.side-rail .loading-state,
+.side-rail .empty-note,
+.side-rail .plan-row-main small {
+  color: var(--side-muted);
+}
+
+.side-rail .auth-provider,
+.side-rail .plan-row {
+  color: #e7eaed;
+  background: #1b1f23;
+  border: 1px solid var(--side-line);
+  border-radius: 3px;
+}
+
+.side-rail .plan-row.current {
+  border-color: var(--accent);
+}
+
+.side-rail .plan-row-main strong,
+.side-rail .auth-user {
+  color: #ffffff;
+}
+
+.side-rail .plan-row-badge {
+  color: #14171a;
+  background: var(--accent);
+}
+
+.side-rail .plan-switcher-new {
+  color: var(--side-muted);
+  background: transparent;
+  border: 1px dashed #3a4046;
+}
+
+.side-rail .secondary-button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: #14171a;
+  font-size: 12px;
+  background: #e7eaed;
+  border: none;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------- 12. 오늘 히어로 (Dashboard.jsx) */
+
+.panel.today-hero {
+  display: grid;
+  gap: 14px;
+  border-top: 4px solid var(--accent);
+}
+
+.today-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.today-head h2 {
+  margin: 2px 0 0;
+  font-size: 32px;
+}
+
+.today-items {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.today-items li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 0;
+  border-top: 1px solid #f2f4f5;
+}
+
+.today-items .ex-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.today-items .ex-num {
+  flex: none;
+  font-family: var(--f-num);
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.today-meal {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 16px 18px;
+  background: #14171a;
+  border-radius: 4px;
+}
+
+.today-meal strong {
+  color: #ffffff;
+  font-size: 30px;
+  font-weight: 400;
+}
+
+.today-meal span {
+  color: var(--side-muted);
+  font-size: 13px;
+}
+
+.panel.today-hero .primary-button {
+  justify-self: start;
+}
+
+/* ---------------------------------------------------- 13. 주간 계획 7행 라인 */
+
+@media (min-width: 1024px) {
+  .day-line {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr) 240px;
+    gap: 20px;
+    align-items: start;
+    padding: 20px;
+  }
+
+  .day-line-head {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+
+  .day-letter {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .day-line-meta {
+    display: grid;
+    gap: 4px;
+    justify-items: start;
+  }
+
+  .ex-lines {
+    padding-left: 0;
+  }
+
+  /* 세 번째 열 = 식단. 원본에서 점선으로 나뉘던 블록을 세로 칸으로 옮깁니다. */
+  .day-line .meal-line {
+    padding: 0 0 0 20px;
+    border-top: none;
+    border-left: 1px solid #eceef0;
+  }
+}
+
+/* ---------------------------------------------------- 14. 명암비 보정 */
+
+/* 밝은 배경 위의 흐린 회색은 본문 대비를 못 넘깁니다. */
+.muted,
+small,
+.hint,
+.note {
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   15. 캔버스(1A 트레이닝 데스크.dc.html)에 맞춘 부분
+   ------------------------------------------------------------------
+   패치 파일에는 없고 캔버스 원본에만 있던 것들이다:
+   사이드바 머리글 2줄, 항목 옆 숫자, 세션 음악, 화면마다 붙는 제목 줄,
+   오늘 화면(2단 + 이번 주 줄), 어두운 식단 카드.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 사이드바 머리글 ─────────────────────────────────────────── */
+
+.rail-brand {
+  display: none;
+  gap: 2px;
+  margin-bottom: 22px;
+}
+
+.rail-brand-mark {
+  color: var(--accent);
+  font-family: var(--f-num);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+}
+
+.rail-brand-name {
+  color: #ffffff;
+  font-family: var(--f-display);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* ── 항목 옆 숫자 ────────────────────────────────────────────── */
+
+.tab-meta {
+  display: none;
+  font-family: var(--f-num);
+  font-size: 13px;
+}
+
+/* ── 사이드바 블록 ───────────────────────────────────────────── */
+
+.side-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.side-chip {
+  padding: 6px 11px;
+  color: #e7eaed;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--side-bg-2);
+  border-radius: 999px;
+}
+
+.side-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: var(--side-bg-2);
+  border-radius: 4px;
+}
+
+.side-card .side-figure {
+  font-family: var(--f-num);
+  font-size: 22px;
+}
+
+.side-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.side-account-state {
+  overflow: hidden;
+  color: #e7eaed;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.side-foot {
+  display: grid;
+  gap: 6px;
+}
+
+.side-foot .side-restart {
+  justify-self: stretch;
+  text-align: left;
+}
+
+/* ── 화면 제목 줄 — 모든 탭이 같은 머리를 쓴다 ────────────────── */
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.page-head > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.page-eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: clamp(26px, 3.4vw, 40px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.page-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.page-actions .primary-button,
+.page-actions .secondary-button {
+  min-height: 46px;
+  padding: 0 18px;
+}
+
+/* ── 오늘 화면 ───────────────────────────────────────────────── */
+
+.today-layout {
+  display: grid;
+  gap: 22px;
+  align-content: start;
+  min-width: 0;
+}
+
+.today-message {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--ink);
+  font-size: 14px;
+  background: #f4f7ef;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+
+.today-grid {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.today-card {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.today-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  border-bottom: 1px solid #eceef0;
+}
+
+.today-badge {
+  padding: 4px 10px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: #eef1ec;
+  border-radius: 999px;
+}
+
+.today-item {
+  border-bottom: 1px solid #f2f4f5;
+}
+
+.today-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 15px 20px;
+}
+
+.today-item-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.today-item-main .ex-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.today-item-main small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.today-item-load,
+.today-item-rx {
+  font-family: var(--f-num);
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.today-item .ex-swap {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.today-item .alt-panel {
+  display: grid;
+  gap: 6px;
+  padding: 0 20px 16px;
+}
+
+.today-alts-head {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.today-alts-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.today-note {
+  margin: 0;
+  padding: 14px 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.today-side {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+
+.today-meal {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  background: var(--ink);
+  border-radius: 5px;
+}
+
+.today-meal-label {
+  color: var(--side-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.today-meal-kcal {
+  color: #ffffff;
+  font-family: var(--f-num);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.today-meal-kcal small {
+  margin-left: 4px;
+  color: var(--side-muted);
+  font-size: 15px;
+}
+
+.today-macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.today-macro {
+  padding: 5px 10px;
+  color: #e7eaed;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--side-bg-2);
+  border-radius: 999px;
+}
+
+.today-macro.on {
+  color: var(--ink);
+  font-weight: 700;
+  background: var(--accent);
+}
+
+.today-meal-menu {
+  margin-top: 4px;
+  color: var(--side-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.today-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.today-stat {
+  display: grid;
+  gap: 3px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.today-stat span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.today-stat strong {
+  font-family: var(--f-num);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+/* ── 이번 주 줄 ──────────────────────────────────────────────── */
+
+.week-strip-wrap {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.week-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.week-strip-head span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.week-strip-item {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 14px 12px;
+  font: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid #cdd2d6;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.week-strip-item strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.week-strip-day {
+  color: var(--ink);
+  font-family: var(--f-num);
+  font-size: 15px;
+}
+
+.week-strip-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 부위 색은 인체도와 같은 값을 쓴다(App.css 의 --m-*). */
+.week-strip-item.m-chest { border-top-color: var(--m-chest); }
+.week-strip-item.m-back { border-top-color: var(--m-back); }
+.week-strip-item.m-legs { border-top-color: var(--m-legs); }
+.week-strip-item.m-glute { border-top-color: var(--m-glute); }
+.week-strip-item.m-shoulder { border-top-color: var(--m-shoulder); }
+.week-strip-item.m-arm { border-top-color: var(--m-arm); }
+.week-strip-item.m-core { border-top-color: var(--m-core); }
+.week-strip-item.m-cardio { border-top-color: var(--m-cardio); }
+
+.week-strip-item.rest {
+  background: #f2f4f5;
+}
+
+.week-strip-item.rest strong,
+.week-strip-item.rest .week-strip-day {
+  color: var(--muted);
+}
+
+.week-strip-item.today {
+  background: var(--ink);
+  border-color: var(--ink);
+  border-top-color: var(--accent);
+}
+
+.week-strip-item.today strong {
+  color: #ffffff;
+}
+
+.week-strip-item.today .week-strip-day {
+  color: var(--accent);
+}
+
+.week-strip-item.today .week-strip-meta {
+  color: var(--side-muted);
+}
+
+/* ── 넓은 화면 ───────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  .rail-brand {
+    display: grid;
+  }
+
+  .tab-meta {
+    display: block;
+  }
+
+  /* 아이콘은 좁은 화면의 하단 탭 바에서만 쓴다. */
+  .tab-icon {
+    display: none;
+  }
+
+  .tab {
+    justify-content: space-between;
+  }
+
+  /* 머리글이 블록으로 들어왔으므로 위쪽 여백을 캔버스 값으로 되돌린다. */
+  .tab-bar {
+    padding: 26px 20px;
+  }
+
+  .today-grid {
+    grid-template-columns: 1.55fr 1fr;
+  }
+
+  .week-strip {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+/* ── 주간 계획 화면 ──────────────────────────────────────────── */
+
+.dashboard-layout {
+  gap: 22px;
+  align-content: start;
+}
+
+/* 조정 기록 — 캔버스의 ADJUSTMENT LOG 카드 */
+.panel.notice-panel {
+  display: grid;
+  gap: 10px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ink);
+  border-radius: 5px;
+}
+
+.panel.notice-panel ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.panel.notice-panel li {
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  gap: 10px;
+  align-items: start;
+  color: #3b4046;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.panel.notice-panel li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-top: 7px;
+  background: var(--ink);
+  border-radius: 999px;
+}
+
+.notice-foot {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 요일 줄은 카드 하나 안에 줄로 이어진다. */
+.panel:has(> .day-lines) {
+  overflow: hidden;
+  padding: 0;
+}
+
+.day-lines {
+  gap: 0;
+}
+
+.day-line {
+  border: none;
+  border-bottom: 1px solid #eceef0;
+  border-radius: 0;
+}
+
+.day-line:last-child {
+  border-bottom: none;
+}
+
+/* 치트데이와 AI 코칭은 나란히 */
+.plan-bottom {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* AI 코칭은 어두운 카드 */
+.panel.coaching-panel {
+  background: var(--ink);
+  border: none;
+}
+
+.panel.coaching-panel .eyebrow,
+.panel.coaching-panel .section-heading p {
+  color: var(--side-muted);
+}
+
+.panel.coaching-panel h2,
+.panel.coaching-panel h3 {
+  color: #ffffff;
+}
+
+.panel.coaching-panel li,
+.panel.coaching-panel p,
+.panel.coaching-panel article {
+  color: #e7eaed;
+}
+
+.panel.coaching-panel ul {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.panel.coaching-panel ul li {
+  padding-left: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  border-left: 3px solid #3a4046;
+}
+
+.panel.coaching-panel ul li:first-child {
+  border-left-color: var(--accent);
+}
+
+.panel.coaching-panel .guide-grid article {
+  padding: 12px 14px;
+  font-size: 13px;
+  background: var(--side-bg-2);
+  border: none;
+  border-radius: 4px;
+}
+
+@media (min-width: 1024px) {
+  .plan-bottom {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* 3열 배치를 칸마다 못 박는다. 식단은 3열, 버튼은 그 아래. */
+  .day-line-head {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .day-line .ex-lines {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .day-line .meal-line {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .day-line .plan-note {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .day-line .day-line-actions {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: start;
+    padding-left: 20px;
+  }
+}
+
+/* 화면 제목 아래로 내려온 설명 한 줄. */
+.page-lede {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── 설문 단계 줄 (캔버스의 왼쪽 칩) ─────────────────────────── */
+
+.step-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.step-chip {
+  padding: 6px 11px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.step-chip.done {
+  color: var(--ink);
+  background: #e4e7e3;
+  border-color: transparent;
+}
+
+.step-chip.on {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.onboarding-container h2 {
+  font-family: var(--f-display);
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}

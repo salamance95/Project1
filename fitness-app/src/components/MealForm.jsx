@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 
 const MEAL_TYPES = ["아침", "점심", "저녁", "간식"];
@@ -13,11 +13,25 @@ export default function MealForm({ isBusy, onSave }) {
   const [text, setText] = useState("");
   const [estimate, setEstimate] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [photoStatus, setPhotoStatus] = useState(null);
+  const [isReading, setIsReading] = useState(false);
+  const fileRef = useRef(null);
+  // 사진이 채워 넣은 문장과 그때의 추정치. 문장을 손대면 다시 계산한다.
+  const photoResult = useRef(null);
 
   // 타이핑이 멈춘 뒤에만 추정을 요청한다.
   useEffect(() => {
     const trimmed = text.trim();
     if (!trimmed) return undefined;
+
+    // 사진이 읽어준 문장을 아직 고치지 않았다면 사진 쪽 추정치가 더 정확하다.
+    // (음식 DB에 없는 음식은 텍스트로 다시 계산하면 0kcal이 된다.)
+    if (photoResult.current && photoResult.current.text === trimmed) {
+      setEstimate(photoResult.current.estimate);
+      setIsEstimating(false);
+      return undefined;
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -48,11 +62,58 @@ export default function MealForm({ isBusy, onSave }) {
     }
   };
 
+  const readPhoto = async (file) => {
+    if (!file) return;
+
+    setPhoto({ name: file.name, url: URL.createObjectURL(file) });
+    setPhotoStatus(null);
+    setIsReading(true);
+
+    try {
+      const result = await api.analyzeMealPhoto(file);
+
+      if (result.available && result.text) {
+        // 인식 결과를 입력칸에 채워 넣고, 사용자가 고칠 수 있게 둔다.
+        photoResult.current = { text: result.text.trim(), estimate: result.estimate };
+        handleTextChange(result.text);
+        setPhotoStatus({
+          kind: "ok",
+          message: `${result.model}이(가) 읽었습니다. 틀린 부분은 고쳐주세요.`,
+          confidence: result.confidence,
+        });
+      } else {
+        setPhotoStatus({
+          kind: "warn",
+          message: result.reason || result.note || "사진에서 음식을 찾지 못했습니다.",
+        });
+      }
+    } catch (err) {
+      setPhotoStatus({ kind: "warn", message: err.message });
+    } finally {
+      setIsReading(false);
+    }
+  };
+
+  const clearPhoto = () => {
+    if (photo?.url) URL.revokeObjectURL(photo.url);
+    setPhoto(null);
+    setPhotoStatus(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
   const submit = async () => {
-    const ok = await onSave({ mealType, description: text.trim() });
+    // 추정치를 같이 보낸다. 안 보내면 서버가 음식 DB로만 다시 계산해서
+    // AI가 어림한 음식이 0kcal로 빠진다.
+    const ok = await onSave({
+      mealType,
+      description: text.trim(),
+      ...(estimate?.total ?? {}),
+    });
     if (ok) {
       setText("");
       setEstimate(null);
+      photoResult.current = null;
+      clearPhoto();
     }
   };
 
@@ -72,6 +133,42 @@ export default function MealForm({ isBusy, onSave }) {
           </button>
         ))}
       </div>
+
+      <div className="photo-row">
+        <button
+          type="button"
+          className="secondary-button photo-button"
+          onClick={() => fileRef.current?.click()}
+          disabled={isReading || isBusy}
+        >
+          {isReading ? "사진 읽는 중..." : "사진으로 입력"}
+        </button>
+        <input
+          ref={fileRef}
+          className="photo-input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          onChange={(event) => readPhoto(event.target.files?.[0])}
+        />
+        {photo && (
+          <button type="button" className="icon-button" onClick={clearPhoto}>
+            사진 지우기
+          </button>
+        )}
+      </div>
+
+      {photo && (
+        <div className="photo-preview">
+          <img src={photo.url} alt="올린 식사 사진" />
+          {photoStatus && (
+            <p className={`photo-status ${photoStatus.kind}`}>
+              {photoStatus.message}
+              {photoStatus.confidence === "low" && " (확신 낮음)"}
+            </p>
+          )}
+        </div>
+      )}
 
       <textarea
         className="meal-textarea"
@@ -93,6 +190,7 @@ export default function MealForm({ isBusy, onSave }) {
                     <span>
                       {item.name} {item.amount}
                       {item.unit} ({item.grams}g)
+                      {item.source === "ai" && <em className="ai-tag">AI 추정</em>}
                     </span>
                     <strong>
                       {item.calories}kcal · P{item.protein}

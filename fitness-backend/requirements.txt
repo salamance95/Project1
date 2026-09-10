@@ -2,12 +2,13 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.6
 sqlalchemy>=2.0
+python-multipart>=0.0.9
 
 # 선택 사항 1: Redis. 설치돼 있고 서버가 떠 있으면 캐시 백엔드로 자동 사용된다.
 # 없으면 프로세스 내 메모리 캐시로 조용히 내려간다.
 # redis>=5.0
 
-# 선택 사항 2: Claude 코칭 모델. 설치 + 자격 증명(ANTHROPIC_API_KEY 또는 ant auth login)이
-# 모두 있어야 활성화되며, 기본 모델은 여전히 규칙 기반이다.
-# FITNESS_AI_MODEL=claude 로 기본값을 바꾸고, FITNESS_ENABLE_MODEL_AB=1 로 A/B를 켠다.
+# 선택 사항 2: Claude 모델. 설치 + 자격 증명(ANTHROPIC_API_KEY 또는 ant auth login)이
+# 모두 있어야 활성화된다. 식사 사진 인식은 이 모델이 있어야 동작한다.
+# FITNESS_AI_MODEL=claude 로 기본값을 바꾼다.
 # anthropic>=1.3

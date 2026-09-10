@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import GrowthBody, { START_BUILD } from "./GrowthBody";
 
 const KIND_LABEL = {
   workout: "운동",
@@ -48,8 +49,30 @@ export default function Achievements({ userId, refreshToken }) {
     ? Math.min(Math.round((summary.points / nextAt) * 100), 100)
     : 100;
 
+  // 체형은 획득한 뱃지 비율로 정한다. 뱃지는 회수되지 않으므로 몸이 되돌아가지
+  // 않는다. (레벨 진행도는 레벨이 오를 때마다 분모가 커져 되레 줄어든다.)
+  const badgeRate = summary.badges.length
+    ? summary.earnedCount / summary.badges.length
+    : 0;
+  const build = START_BUILD + (1 - START_BUILD) * badgeRate;
+
+  // 가장 가까운 다음 도전과제 하나만 짚어 준다.
+  const nextBadge = summary.badges
+    .filter((badge) => !badge.earned)
+    .sort(
+      (a, b) =>
+        b.progress.current / b.progress.target - a.progress.current / a.progress.target,
+    )[0];
+
   return (
     <section className="achievement-layout">
+      <header className="page-head">
+        <div>
+          <span className="page-eyebrow">리포트 · LEVEL {summary.level}</span>
+          <h1>성장</h1>
+        </div>
+      </header>
+
       <section className="panel level-card">
         <div className="level-head">
           <div>
@@ -67,6 +90,33 @@ export default function Achievements({ userId, refreshToken }) {
             ? `다음 레벨까지 ${(nextAt - summary.points).toLocaleString()}P 남았습니다.`
             : "최고 레벨에 도달했습니다."}
         </p>
+      </section>
+
+      <section className="panel growth-card">
+        <div className="section-heading">
+          <div>
+            <h2>성장</h2>
+            <p>도전과제를 깰수록 몸이 붙습니다. 왼쪽이 시작할 때의 체형입니다.</p>
+          </div>
+          <strong className="growth-rate">{Math.round(badgeRate * 100)}%</strong>
+        </div>
+
+        <GrowthBody build={build} />
+
+        <div className="growth-status">
+          <p className="growth-count">
+            도전과제 <strong>{summary.earnedCount}</strong> / {summary.badges.length} 달성
+          </p>
+          {nextBadge ? (
+            <p className="growth-next">
+              다음 <strong>{nextBadge.icon} {nextBadge.name}</strong> —{" "}
+              {nextBadge.progress.current.toLocaleString()} /{" "}
+              {nextBadge.progress.target.toLocaleString()}
+            </p>
+          ) : (
+            <p className="growth-next">모든 도전과제를 달성했습니다.</p>
+          )}
+        </div>
       </section>
 
       <div className="metrics-grid">

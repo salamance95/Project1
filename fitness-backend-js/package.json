@@ -1,0 +1,22 @@
+{
+  "name": "fitness-backend-js",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "파이썬 FastAPI 백엔드를 Express + Drizzle로 옮긴 버전",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "compare": "node --env-file-if-exists=.env scripts/compare.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "better-sqlite3": "^11.5.0",
+    "cors": "^2.8.5",
+    "drizzle-orm": "^0.36.0",
+    "express": "^4.21.1",
+    "multer": "^1.4.5-lts.1",
+    "zod": "^3.23.8"
+  }
+}

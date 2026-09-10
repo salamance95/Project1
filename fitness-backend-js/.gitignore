@@ -1,0 +1,3 @@
+node_modules/
+# API 키가 들어가는 파일. 커밋하지 않는다.
+.env

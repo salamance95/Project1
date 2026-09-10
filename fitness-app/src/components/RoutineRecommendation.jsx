@@ -60,14 +60,32 @@ export default function RoutineRecommendation({ userProfile, userId, onSelect, o
 
   return (
     <section className="recommendation-layout">
+      <header className="page-head">
+        <div>
+          <span className="page-eyebrow">ROUTINE RECOMMENDATION</span>
+          <h1>맞춤 1주 플랜을 선택하세요</h1>
+        </div>
+      </header>
+
       <div className="panel section-heading">
         <div>
-          <p className="eyebrow">Routine Recommendation</p>
-          <h2>맞춤 1주 플랜을 선택하세요</h2>
           <p>
             {userProfile.goal} / {userProfile.level} / {userProfile.frequency} /{" "}
             {userProfile.duration} / {userProfile.style}
           </p>
+          {plans.length > 0 && (
+            <p className="plan-basis">
+              분할 {plans[0].split}
+              {plans[0].splitAuto ? "(자동)" : ""}
+              {plans[0].bmi ? ` · BMI ${plans[0].bmi}` : ""}
+              {plans[0].preciseBody
+                ? ` · 체지방 ${plans[0].bodyFat ?? "-"}% · ${plans[0].bodyType ?? plans[0].bmiCategory}`
+                : plans[0].bmi
+                  ? `(${plans[0].bmiCategory})`
+                  : ""}
+              {plans[0].bmiNote ? ` — ${plans[0].bmiNote}` : ""}
+            </p>
+          )}
         </div>
         <button type="button" className="secondary-button" onClick={onBack}>
           이전
@@ -90,7 +108,9 @@ export default function RoutineRecommendation({ userProfile, userId, onSelect, o
         {plans.map((plan) => (
           <article className="routine-card" key={plan.id}>
             <div>
-              <p className="eyebrow">{plan.variant} · 운동 + 식단 + 코칭</p>
+              <p className="eyebrow">
+                {plan.variant} · {plan.split} · 운동 + 식단 + 코칭
+              </p>
               <h3>{plan.title}</h3>
               <p>{plan.description}</p>
             </div>
